@@ -19,7 +19,7 @@ uint32_t  sample_time = 1000000/4;
 boolean   READING = true;
 
 boolean   newCommand = false;
-String    ADDRESS = "stir";
+String    ADDRESS = "str";
 String    inputString = "";
 
 float setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -67,7 +67,7 @@ float Kd = 0.0009;
 xQueueHandle pcnt_evt_queue;   // A queue to handle pulse counter events
 pcnt_isr_handle_t user_isr_handle = NULL; //user's ISR service handle
 
-esp_timer_create_args_t create_args;                                  
+esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
 
 QuickPID PID_0(&rpm[0], &output[0], &setpoint[0]);
@@ -101,14 +101,14 @@ static void IRAM_ATTR pcnt_intr_handler(void *arg)
     pcnt_evt_t evt;
     portBASE_TYPE HPTaskAwoken = pdFALSE;
 
-    
+
     for (i = 0; i < PCNT_UNIT_MAX; i++) {
         if (intr_status & (BIT(i))) {
             evt.unit = i;
             /* Save the PCNT event type that caused an interrupt
                to pass it to the main program */
             evt.status = PCNT.status_unit[i].val;
-            evt.timeStamp = currentMillis; 
+            evt.timeStamp = currentMillis;
             PCNT.int_clr.val = BIT(i);
             xQueueSendFromISR(pcnt_evt_queue, &evt, &HPTaskAwoken);
             if (HPTaskAwoken == pdTRUE) {
@@ -124,7 +124,7 @@ static void IRAM_ATTR pcnt_intr_handler(void *arg)
 
 void pcnt_init_channel(pcnt_unit_t PCNT_UNIT, int PCNT_INPUT_SIG_IO, pcnt_channel_t PCNT_CHANNEL = PCNT_CHANNEL_0, int PCNT_H_LIM_VAL = 20000) {
     /* Prepare configuration for the PCNT unit */
-    pcnt_config_t pcnt_config; 
+    pcnt_config_t pcnt_config;
         // Set PCNT input signal and control GPIOs
         pcnt_config.pulse_gpio_num = PCNT_INPUT_SIG_IO;
         pcnt_config.ctrl_gpio_num = 22;
@@ -139,7 +139,7 @@ void pcnt_init_channel(pcnt_unit_t PCNT_UNIT, int PCNT_INPUT_SIG_IO, pcnt_channe
         // Set the maximum and minimum limit values to watch
         pcnt_config.counter_h_lim = PCNT_H_LIM_VAL;
         pcnt_config.counter_l_lim = -1;
-    
+
     /* Initialize PCNT unit */
     pcnt_unit_config(&pcnt_config);
     /* Configure and enable the input filter */
@@ -154,7 +154,7 @@ void pcnt_init_channel(pcnt_unit_t PCNT_UNIT, int PCNT_INPUT_SIG_IO, pcnt_channe
     /* Initialize PCNT's counter */
     pcnt_counter_pause(PCNT_UNIT);
     pcnt_counter_clear(PCNT_UNIT);
-    
+
     /* Register ISR handler and enable interrupts for PCNT unit */
     pcnt_isr_register(pcnt_intr_handler, NULL, 0, &user_isr_handle);
     pcnt_intr_enable(PCNT_UNIT);
@@ -168,8 +168,8 @@ void read_PCNT(void *p) {
 }
 
 void setup() {
-  Serial.begin(9600);
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
+  //Serial.begin(9600);
+  Serial2.begin(230400, SERIAL_8N1, 16, 17);
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_1, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_2, LEDC_BASE_FREQ, LEDC_BIT);
@@ -178,7 +178,7 @@ void setup() {
   ledcSetup(LEDC_CHANNEL_5, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_6, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_7, LEDC_BASE_FREQ, LEDC_BIT);
-  
+
   ledcAttachPin(MOTOR_PIN_0, LEDC_CHANNEL_0);
   ledcAttachPin(MOTOR_PIN_1, LEDC_CHANNEL_1);
   ledcAttachPin(MOTOR_PIN_2, LEDC_CHANNEL_2);
@@ -187,7 +187,7 @@ void setup() {
   ledcAttachPin(MOTOR_PIN_5, LEDC_CHANNEL_5);
   ledcAttachPin(MOTOR_PIN_6, LEDC_CHANNEL_6);
   ledcAttachPin(MOTOR_PIN_7, LEDC_CHANNEL_7);
-  
+
   ledcWrite(LEDC_CHANNEL_0, 0);
   ledcWrite(LEDC_CHANNEL_1, 0);
   ledcWrite(LEDC_CHANNEL_2, 0);
@@ -197,7 +197,7 @@ void setup() {
   ledcWrite(LEDC_CHANNEL_6, 0);
   ledcWrite(LEDC_CHANNEL_7, 0);
   delay(500);
-  
+
     /* Initialize PCNT event queue and PCNT functions */
   pcnt_evt_queue = xQueueCreate(10, sizeof(pcnt_evt_t));
   pcnt_init_channel(PCNT_UNIT_0, TACHOMETER_PIN_0);
@@ -211,7 +211,7 @@ void setup() {
 
   create_args.callback = read_PCNT; // Set esp-timer argument
   esp_timer_create(&create_args, &timer_handle);
-  
+
   PID_0.SetMode(PID_0.Control::automatic);
   PID_1.SetMode(PID_1.Control::automatic);
   PID_2.SetMode(PID_2.Control::automatic);
@@ -221,7 +221,7 @@ void setup() {
   PID_6.SetMode(PID_6.Control::automatic);
   PID_7.SetMode(PID_7.Control::automatic);
   for (byte i = 0; i<8; i++){
-    allPIDS[i]->SetOutputLimits(0, 255);
+    allPIDS[i]->SetOutputLimits(80, 200);
     allPIDS[i]->SetTunings(Kp, Ki, Kd);
   }
 }
@@ -240,7 +240,7 @@ void loop()
     pcnt_get_counter_value(PCNT_UNIT_5, &pulses[5]);
     pcnt_get_counter_value(PCNT_UNIT_6, &pulses[6]);
     pcnt_get_counter_value(PCNT_UNIT_7, &pulses[7]);
-    
+
     for (byte i = 0; i < 8; i = i + 1) {
       String p = (String) pulses[i];
       if (p.toFloat() > 0){
@@ -264,7 +264,7 @@ void loop()
     //Serial.println(rpm[0]);
     //printf("%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f\n", rpm[0], rpm[1], rpm[2], rpm[3], rpm[4], rpm[5], rpm[6], rpm[7]);
     //printf("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", output[0], output[1], output[2], output[3], output[4], output[5], output[6], output[7]);
-    
+
     pcnt_counter_clear(PCNT_UNIT_0);
     pcnt_counter_clear(PCNT_UNIT_1);
     pcnt_counter_clear(PCNT_UNIT_2);
@@ -277,11 +277,11 @@ void loop()
     esp_timer_start_once(timer_handle, sample_time);
     READING = false;
   }
- 
+
   parseSerial();
   parseString(inputString);
   inputString = "";
-  
+
   if(user_isr_handle) {
     //Free the ISR service handle.
     esp_intr_free(user_isr_handle);
@@ -303,7 +303,7 @@ void parseSerial(void){
 void parseString(String inputString){
   if(newCommand){
     String ADDR = inputString.substring(0, inputString.indexOf(' '));
-    
+
     if(ADDR == ADDRESS){
       int firstcomma = inputString.indexOf(',');
       String cmd = inputString.substring(inputString.indexOf(' '), firstcomma);
@@ -318,22 +318,21 @@ void parseString(String inputString){
           setpoint[i] = value;
           lastcomma = nextcomma;
         }
-
         Serial2.println("115!");
       }
       else if (command == 2){
         Serial2.println("115!");
       }
       else if (command == 3){
-        String sample = "stir ";
+        String sample;
         for(byte i = 0; i < 8; i++){
-          sample = sample + "," + (String) rpm[i];
+          sample = ADDRESS + " ," + (String) rpm[i];
         }
         sample = sample + ",115,!";
         Serial2.print(sample);
       }
     }
-    
+
     inputString = "";
     newCommand = false;
   }

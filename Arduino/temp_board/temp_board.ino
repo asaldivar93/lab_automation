@@ -8,7 +8,7 @@ String          inputString = "";
 
 unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0};
 float           temp[8];
-float a[8];
+float           a[8];
 float           sample_number = 0;
 uint32_t        sample_time = 1000000/1;
 boolean         READING = false;
@@ -16,7 +16,7 @@ float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
 int             resistorReference = 10000;
 
-float           setpoint[] = {-100, 35, -100, -100, -100, -100, -100, -100};
+float           setpoint[] = {-100, -100, -100, -100, -100, -100, -100, -100};
 float           output[8];
 float           Kp = 140;
 float           Ki = 0.004;
@@ -61,7 +61,7 @@ QuickPID PID_6(&temp[6], &output[6], &setpoint[6]);
 QuickPID PID_7(&temp[7], &output[7], &setpoint[7]);
 QuickPID *allPIDS[8] = {&PID_0, &PID_1, &PID_2, &PID_3, &PID_4, &PID_5, &PID_6, &PID_7};
 
-esp_timer_create_args_t create_args;                                  
+esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
 
 void read_temp(void *p) {
@@ -69,10 +69,10 @@ void read_temp(void *p) {
 }
 
 void setup() {
-  Serial.begin(9600);
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
+  //Serial.begin(9600);
+  Serial2.begin(230400, SERIAL_8N1, 16, 17);
 
-  ADC1.begin(CS1); 
+  ADC1.begin(CS1);
   ADC1.setSPIspeed(1000000);
 
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_BIT);
@@ -83,7 +83,7 @@ void setup() {
   ledcSetup(LEDC_CHANNEL_5, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_6, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_7, LEDC_BASE_FREQ, LEDC_BIT);
-  
+
   ledcAttachPin(HEATER_PIN_0, LEDC_CHANNEL_0);
   ledcAttachPin(HEATER_PIN_1, LEDC_CHANNEL_1);
   ledcAttachPin(HEATER_PIN_2, LEDC_CHANNEL_2);
@@ -92,7 +92,7 @@ void setup() {
   ledcAttachPin(HEATER_PIN_5, LEDC_CHANNEL_5);
   ledcAttachPin(HEATER_PIN_6, LEDC_CHANNEL_6);
   ledcAttachPin(HEATER_PIN_7, LEDC_CHANNEL_7);
-  
+
   ledcWrite(LEDC_CHANNEL_0, 0);
   ledcWrite(LEDC_CHANNEL_1, 0);
   ledcWrite(LEDC_CHANNEL_2, 0);
@@ -127,7 +127,7 @@ void loop() {
     for (byte i = 0; i < ADC1.channels(); i++) {
       analog[i] += ADC1.analogRead(i);
     }
-    sample_number += 1; 
+    sample_number += 1;
   }
 
   if (READING) {
@@ -153,10 +153,10 @@ void loop() {
     //printf("%f %f %f %f %f %f %f %f\n", a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
     //printf("%f %f %f %f %f %f %f %f\n", temp[0], temp[1], temp[2], temp[3], temp[4], temp[5], temp[6], temp[7]);
     //printf("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", output[0], output[1], output[2], output[3], output[4], output[5], output[6], output[7]);
-    printf("%f %f\n", temp[1], output[1]);
-   
+    //printf("%f %f\n", temp[1], output[1]);
+
     esp_timer_start_once(timer_handle, sample_time);
-    READING = false; 
+    READING = false;
   }
   parseSerial();
   parseString(inputString);
@@ -177,7 +177,7 @@ void parseSerial(void){
 void parseString(String inputString){
   if(newCommand){
     String ADDR = inputString.substring(0, inputString.indexOf(' '));
-    
+
     if(ADDR == ADDRESS){
       int firstcomma = inputString.indexOf(',');
       String cmd = inputString.substring(inputString.indexOf(' '), firstcomma);
@@ -192,23 +192,21 @@ void parseString(String inputString){
           setpoint[i] = value;
           lastcomma = nextcomma;
         }
-        //Serial.println("115!");
         Serial2.println("115!");
       }
       else if (command == 2){
-        //Serial.println("115!");
         Serial2.println("115!");
       }
       else if (command == 3){
-        String sample = "tmp ";
+        String sample;
         for(byte i = 0; i < 8; i++){
-          sample = sample + "," + (String) temp[i];
+          sample = ADDRESS + " ," + (String) temp[i];
         }
         sample = sample + ",115,!";
         Serial2.print(sample);
       }
     }
-    
+
     inputString = "";
     newCommand = false;
   }
