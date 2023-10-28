@@ -198,12 +198,13 @@ void parseString(String inputString){
         Serial2.println("115!");
       }
       else if (command == 3){
-        String sample;
+        Serial2.println("115!");
+        String sample = ADDRESS + " ";
         for(byte i = 0; i < 8; i++){
-          sample = ADDRESS + " ," + (String) temp[i];
+          sample = sample + "," + (String) temp[i];
         }
         sample = sample + ",115,!";
-        Serial2.print(sample);
+        Serial2.println(sample);
       }
     }
 

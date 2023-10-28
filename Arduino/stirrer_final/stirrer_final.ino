@@ -21,6 +21,7 @@ boolean   READING = true;
 boolean   newCommand = false;
 String    ADDRESS = "str";
 String    inputString = "";
+boolean   comm_confirmed;
 
 float setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0};
 float output[8];
@@ -168,7 +169,6 @@ void read_PCNT(void *p) {
 }
 
 void setup() {
-  //Serial.begin(9600);
   Serial2.begin(230400, SERIAL_8N1, 16, 17);
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_1, LEDC_BASE_FREQ, LEDC_BIT);
@@ -261,7 +261,9 @@ void loop()
     ledcWrite(LEDC_CHANNEL_6, output[6]);
     ledcWrite(LEDC_CHANNEL_7, output[7]);
 
-    //Serial.println(rpm[0]);
+
+//    Serial.println(setpoint[0]);
+//    Serial.println(rpm[0]);
     //printf("%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f\n", rpm[0], rpm[1], rpm[2], rpm[3], rpm[4], rpm[5], rpm[6], rpm[7]);
     //printf("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", output[0], output[1], output[2], output[3], output[4], output[5], output[6], output[7]);
 
@@ -324,12 +326,13 @@ void parseString(String inputString){
         Serial2.println("115!");
       }
       else if (command == 3){
-        String sample;
+        Serial2.println("115!");
+        String sample = ADDRESS + " ";
         for(byte i = 0; i < 8; i++){
-          sample = ADDRESS + " ," + (String) rpm[i];
+          sample = sample + "," + (String) rpm[i];
         }
         sample = sample + ",115,!";
-        Serial2.print(sample);
+        Serial2.println(sample);
       }
     }
 
