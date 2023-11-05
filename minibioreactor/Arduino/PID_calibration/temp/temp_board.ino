@@ -3,17 +3,21 @@
 #include "QuickPID.h"
 
 boolean         newCommand = false;
-String          ADDRESS = "bms";
+String          ADDRESS = "tmp";
 String          inputString = "";
 
 unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0};
-float           biomass[8];
-float           sample_number = 0;
-uint32_t        sample_time = 1000000/4;
+float           temp[8];
+float           a[8];
+uint32_t        sample_per_second = 1;
+uint32_t        sample_time = 1000000 / sample_per_second;
 boolean         READING = false;
 float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
 int             resistorReference = 10000;
+
+float           setpoint[] = {-100, -100, -100, -100, -100, -100, -100, -100};
+
 
 #define MCP_DOUT 21
 #define MCP_DIN  22
@@ -42,21 +46,20 @@ int             resistorReference = 10000;
 #define HEATER_PIN_6 33
 #define HEATER_PIN_7 32
 
-//MCP3208 ADC1(MCP_DOUT, MCP_DIN, MCP_CLK);
+MCP3208 ADC1(MCP_DOUT, MCP_DIN, MCP_CLK);
 
 esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
 
 void read_temp(void *p) {
-  READING = true;                                                            // Change flag to enable print
+  READING = true;           // Change flag to enable print
 }
 
 void setup() {
-  //Serial.begin(9600);
-  Serial2.begin(230400, SERIAL_8N1, 16, 17);
+  Serial.begin(230400);
 
-  //ADC1.begin(CS1);
-  //ADC1.setSPIspeed(1000000);
+  ADC1.begin(CS1);
+  ADC1.setSPIspeed(1000000);
 
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_1, LEDC_BASE_FREQ, LEDC_BIT);
@@ -76,14 +79,14 @@ void setup() {
   ledcAttachPin(HEATER_PIN_6, LEDC_CHANNEL_6);
   ledcAttachPin(HEATER_PIN_7, LEDC_CHANNEL_7);
 
-  ledcWrite(LEDC_CHANNEL_0, 255);
-  ledcWrite(LEDC_CHANNEL_1, 255);
-  ledcWrite(LEDC_CHANNEL_2, 255);
-  ledcWrite(LEDC_CHANNEL_3, 255);
-  ledcWrite(LEDC_CHANNEL_4, 255);
-  ledcWrite(LEDC_CHANNEL_5, 255);
-  ledcWrite(LEDC_CHANNEL_6, 255);
-  ledcWrite(LEDC_CHANNEL_7, 255);
+  ledcWrite(LEDC_CHANNEL_0, 0);
+  ledcWrite(LEDC_CHANNEL_1, 0);
+  ledcWrite(LEDC_CHANNEL_2, 0);
+  ledcWrite(LEDC_CHANNEL_3, 0);
+  ledcWrite(LEDC_CHANNEL_4, 0);
+  ledcWrite(LEDC_CHANNEL_5, 0);
+  ledcWrite(LEDC_CHANNEL_6, 0);
+  ledcWrite(LEDC_CHANNEL_7, 0);
   delay(500);
 
   create_args.callback = read_temp; // Set esp-timer argument
@@ -94,19 +97,20 @@ void setup() {
 void loop() {
 
   if (!READING){
-    //for (byte i = 0; i < ADC1.channels(); i++) {
-    //  analog[i] += ADC1.analogRead(i);
-    //}
-    //sample_number += 1;
+    for (byte i = 0; i < ADC1.channels(); i++) {
+      analog[i] += ADC1.analogRead(i);
+    }
+    sample_number += 1;
   }
 
   if (READING) {
-//    for (byte i = 0; i < ADC1.channels(); i++) {
-//      float a = analog[i] / sample_number;
-//      biomass[i] = a;
-//      analog[i] = 0;
-//    }
-//    sample_number = 0;
+    for (byte i = 0; i < ADC1.channels(); i++) {
+      a[i] = analog[i] / sample_number;
+      float r = resistorReference/((4095*inputVoltage/(a[i]*refVoltage))-1);
+      temp[i] = (1 / ( 8.294e-4 + 2.624e-4*log(r) + 1.369e-7*pow(log(r), 3) )) - 273.15;
+      analog[i] = 0;
+    }
+    sample_number = 0;
 
     esp_timer_start_once(timer_handle, sample_time);
     READING = false;
@@ -117,8 +121,8 @@ void loop() {
 }
 
 void parseSerial(void){
-  while(Serial2.available()){
-    char inChar = char(Serial2.read());
+  while(Serial.available()){
+    char inChar = char(Serial.read());
     inputString += inChar;
     if(inChar == '!'){
       newCommand = true;
@@ -137,18 +141,35 @@ void parseString(String inputString){
       int command = cmd.toInt();
 
       if(command == 1){
-        Serial2.println("115!");
+        int lastcomma = firstcomma;
+        for (byte i = 0; i < 8; i++){
+          int nextcomma = inputString.indexOf(',', lastcomma + 1);
+          String val = inputString.substring(lastcomma + 1, nextcomma);
+          float value = val.toFloat();
+          setpoint[i] = value;
+          lastcomma = nextcomma;
+        }
+        ledcWrite(LEDC_CHANNEL_0, setpoint[0]);
+        ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
+        ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
+        ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
+        ledcWrite(LEDC_CHANNEL_4, setpoint[4]);
+        ledcWrite(LEDC_CHANNEL_5, setpoint[5]);
+        ledcWrite(LEDC_CHANNEL_6, setpoint[6]);
+        ledcWrite(LEDC_CHANNEL_7, setpoint[7]);
+        Serial.println("115!");
       }
       else if (command == 2){
-        Serial2.println("115!");
+        Serial.println("115!");
       }
       else if (command == 3){
-        String sample;
+        Serial.println("115!");
+        String sample = ADDRESS + " ";
         for(byte i = 0; i < 8; i++){
-          sample = ADDRESS + " ," + (String) biomass[i];
+          sample = sample + "," + (String) temp[i];
         }
         sample = sample + ",115,!";
-        Serial2.print(sample);
+        Serial.println(sample);
       }
     }
 

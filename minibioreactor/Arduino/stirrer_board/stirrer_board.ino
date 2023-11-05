@@ -15,7 +15,9 @@
 
 int16_t   pulses[8];
 float     rpm[8];
-uint32_t  sample_time = 1000000/4;
+uint32_t  sample_per_second = 1;
+uint32_t  sample_time = 1000000 / sample_per_second;
+float     sample_time_seconds = 1000000 / (float) sample_per_second / 1000000;
 boolean   READING = true;
 
 boolean   newCommand = false;
@@ -25,9 +27,9 @@ boolean   comm_confirmed;
 
 float setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0};
 float output[8];
-float Kp = 0.001;
-float Ki = 0.06;
-float Kd = 0.0009;
+float Kp[8] = {0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001};
+float Ki[8] = {0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06};
+float Kd[8] = {0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009};
 
 // use first channel of 16 channels (started from zero)
 #define LEDC_CHANNEL_0 0
@@ -221,8 +223,9 @@ void setup() {
   PID_6.SetMode(PID_6.Control::automatic);
   PID_7.SetMode(PID_7.Control::automatic);
   for (byte i = 0; i<8; i++){
-    allPIDS[i]->SetOutputLimits(80, 200);
-    allPIDS[i]->SetTunings(Kp, Ki, Kd);
+    allPIDS[i]->SetOutputLimits(90, 130);
+    allPIDS[i]->SetTunings(Kp[i], Ki[i], Kd[i]);
+    allPIDS[i]->SetSampleTimeUs(sample_time);
   }
 }
 
@@ -242,9 +245,9 @@ void loop()
     pcnt_get_counter_value(PCNT_UNIT_7, &pulses[7]);
 
     for (byte i = 0; i < 8; i = i + 1) {
-      String p = (String) pulses[i];
-      if (p.toFloat() > 0){
-        rpm[i] = p.toFloat() * 60 * 4 / 2;
+      float p = (float) pulses[i];
+      if (p > 0){
+        rpm[i] = (p / 2) * (1 / sample_time_seconds) * 60;
       }
       else{
         rpm[i] = 0;
@@ -260,12 +263,6 @@ void loop()
     ledcWrite(LEDC_CHANNEL_5, output[5]);
     ledcWrite(LEDC_CHANNEL_6, output[6]);
     ledcWrite(LEDC_CHANNEL_7, output[7]);
-
-
-//    Serial.println(setpoint[0]);
-//    Serial.println(rpm[0]);
-    //printf("%.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f\n", rpm[0], rpm[1], rpm[2], rpm[3], rpm[4], rpm[5], rpm[6], rpm[7]);
-    //printf("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", output[0], output[1], output[2], output[3], output[4], output[5], output[6], output[7]);
 
     pcnt_counter_clear(PCNT_UNIT_0);
     pcnt_counter_clear(PCNT_UNIT_1);

@@ -9,8 +9,8 @@ String          inputString = "";
 unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0};
 float           temp[8];
 float           a[8];
-float           sample_number = 0;
-uint32_t        sample_time = 1000000/1;
+uint32_t        sample_per_second = 1;
+uint32_t        sample_time = 1000000 / sample_per_second;
 boolean         READING = false;
 float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
@@ -117,6 +117,7 @@ void setup() {
   for (byte i = 0; i<8; i++){
     allPIDS[i]->SetOutputLimits(0, 255);
     allPIDS[i]->SetTunings(Kp, Ki, Kd);
+    allPIDS[i]->SetSampleTimeUs(sample_time);
   }
   esp_timer_start_once(timer_handle, sample_time);
 }
