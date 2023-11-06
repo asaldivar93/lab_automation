@@ -14,7 +14,7 @@
 
 int16_t   pulses[8];
 float     rpm[8];
-uint32_t  sample_per_second = 1;
+uint32_t  sample_per_second = 4;
 uint32_t  sample_time = 1000000 / sample_per_second;
 float     sample_time_seconds = 1000000 / (float) sample_per_second / 1000000;
 boolean   READING = true;
