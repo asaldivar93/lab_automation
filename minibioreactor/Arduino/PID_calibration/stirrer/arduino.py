@@ -16,7 +16,7 @@ class sensors(object):
         self,
         ADDRESS,
         port='/dev/ttyUSB0',
-        baud=57600,
+        baud=230400,
     ):
         print('Opening connection')
         self.ADDRESS = ADDRESS
@@ -39,7 +39,8 @@ class sensors(object):
 
     def read(self):
         data = self.sp.readline().decode('UTF-8')
-        data = data.split(" ")[1].split(",")[:8]
+        self.sp.flushInput()
+        data = data.split(" ")[1].split(",")[1:9]
 
         return np.asarray(data, dtype=np.float64, order='C')
 

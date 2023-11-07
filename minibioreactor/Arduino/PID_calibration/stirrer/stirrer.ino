@@ -293,7 +293,6 @@ void parseString(String inputString){
         ledcWrite(LEDC_CHANNEL_5, setpoint[5]);
         ledcWrite(LEDC_CHANNEL_6, setpoint[6]);
         ledcWrite(LEDC_CHANNEL_7, setpoint[7]);
-        Serial.println("115!");
       }
       else if (command == 2){
         Serial.println("115!");

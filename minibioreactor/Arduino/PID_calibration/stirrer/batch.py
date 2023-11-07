@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="str", baud=230400
 )
-experiment_name = "calibration_"
+experiment_name = "test_calibration"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -38,9 +38,10 @@ while(True):
         time = time_delta.days * 24 + time_delta.seconds / 3600  # Time in seconds
 
         # Set the stir rate for each vial
-        stir_rate = pd.read_csv('stir_rate.tsv', sep='\t', index_col="pumps")
+        stir_rate = pd.read_csv('stirrer_rate.csv', index_col="Vial")
         stir_rate = [pwm for pwm in stir_rate['pwm']]
         recorder.update_pumps(stir_rate)
+        print(data[0])
 
         # Dump Data to file
         with open(results_file, 'a+') as file:
