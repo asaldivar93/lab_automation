@@ -13,11 +13,11 @@ import matplotlib.pyplot as plot
 import pandas as pd
 import numpy as np
 
-experiment = 'test_calibration'
+experiment = 'calibracion_resistencia_20231109_1'
 
 parameters_df = pd.DataFrame(columns=["U_loss", "Gain"])
-parameters_df.loc[0, "U_loss"] = 1e-5   # Heat losses to air
-parameters_df.loc[0, "Gain"] = 10  # Heat gain from electric current
+parameters_df.loc[0, "U_loss"] = 12.72345699   # Heat losses to air
+parameters_df.loc[0, "Gain"] = 0.12901237  # Heat gain from electric current
 iter = 0
 objective_val = [0]
 
@@ -30,7 +30,6 @@ with open(results_file, 'w+') as file:
 
 # Initialize figure
 plot.style.use('seaborn')
-experiment = 'test_calibration'
 figure = plot.figure(constrained_layout=True)
 grid = figure.add_gridspec(4, 4)
 
@@ -61,10 +60,10 @@ def electric_heater(T, t, parameters, u):
 
     U_loss = parameters[0]  # W / m^2 s
     gain = parameters[1]  #
-    A = 20  # m^2
-    T_amb = 25  # Celsius
-    R_mass = 50  # grams
-    Cpr = 1  # J / g K
+    A = 0.05346  # m^2
+    T_amb = 24.93  # Celsius
+    R_mass = 212.4  # grams
+    Cpr = 0.710  # J / g K
 
     Q_loss = A * U_loss * (T - T_amb)
     dTrdt = (gain * u - Q_loss) / (R_mass * Cpr)
@@ -86,7 +85,7 @@ def simulate(parameters):
     for i in range(1, N):
         time_interval = [time[i - 1], time[i]]
         solution = odeint(
-            electric_heater, initial_conditions, time_interval, args=(parameters, u[i - 0])
+            electric_heater, initial_conditions, time_interval, args=(parameters, u[i - 1])
         )
 
         simulation_results.loc[i, "Time"] = time[i]
@@ -141,15 +140,15 @@ def update(i):
     global iter
 
     iter = iter + 1
-
-    data = pd.read_csv(experiment + '/data.csv').query("Vial==0")
+    print(iter)	
+    data = pd.read_csv(experiment + '/data.csv')
     data.loc[:, "Time"] = data.loc[:, "Time"] * 3600
-    data = data.reset_index().drop(columns=['index'])
+    data = data.loc[::2].reset_index().drop(columns=['index'])
 
     old_parameters = parameters_df.loc[iter - 1, :].to_list()
     old_results = simulate(old_parameters)
 
-    new_parameters = minimize(objective, old_parameters, method='Nelder-Mead', tol=100)
+    new_parameters = minimize(objective, old_parameters, method='Nelder-Mead', bounds=[(0, None), (0, None)], tol=1)
     parameters_df.loc[iter, :] = new_parameters.x
     objective_val.append(new_parameters.fun)
 
@@ -158,7 +157,7 @@ def update(i):
 
     time = data.loc[:, "Time"]
     rpm = data.loc[:, "T_heater"]
-    rpm_hat = old_results.loc[:, "T_heater_hat"]
+    rpm_hat = old_results.loc[:, "T_heater"]
     gain = parameters_df.loc[:, "Gain"]
     tau = parameters_df.loc[:, "U_loss"]
 
@@ -181,5 +180,5 @@ def update(i):
     ax_obj.autoscale_view(scaley=True)
 
 
-ani = FuncAnimation(figure, update, init_func=init, interval=1000 * 10)
+ani = FuncAnimation(figure, update, init_func=init, interval=1000 * 30)
 plot.show()

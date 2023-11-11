@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="r01", baud=230400
 )
-experiment_name = "test_calibration"
+experiment_name = "calibracion_reactor_20231109"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -41,11 +41,11 @@ while(True):
         pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
         pwm_values = [pwm for pwm in pwm_values['pwm']]
         recorder.update_pumps(pwm_values)
-        print(data[0])
+        print(data[3], data[4], pwm_values[1])
 
         # Dump Data to file
         with open(results_file, 'a+') as file:
             pd.DataFrame(
-                [[date.strftime("%d-%m-%Y_%H-%M-%S"), time, data[3], data[4], pwm_values[2]]],
+                [[date.strftime("%d-%m-%Y_%H-%M-%S"), time, data[3], data[4], pwm_values[1]]],
                 columns=['Date', 'Time', 'T_heater', 'T_liquid', 'PWM']
             ).to_csv(file, index=False, header=False)

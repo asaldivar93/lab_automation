@@ -17,7 +17,7 @@ float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
 int             resistorReference = 10000;
 
-float           setpoint[] = {10, 0, 0, 0, 0, 0, 0, 0}; // Set point for PWM output
+float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0}; // Set point for PWM output
 
 #define MCP_DOUT 18
 #define MCP_DIN  19
