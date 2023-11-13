@@ -123,12 +123,16 @@ void loop() {
     sample_values[6] = analog[0] / sample_number;
     sample_values[7] = analog[0] / sample_number;
 
+    // S-H equation for thin film resistor
+    sample_values[i] = (1 / ( 8.294e-4 + 2.624e-4*log(r) + 1.369e-7*pow(log(r), 3) )) - 273.15;
+
     // Channels 3, 4, and 5 have 10Kohm resistors connected to 3.3V
     // to record temperature from a 10Kohm NTC termistor
     for (byte i = 3; i < 6; i++) {
       a[i] = analog[i] / sample_number; // dummy variable
+      // S-H equation for water resistant termistor
       float r = resistorReference/((4095*inputVoltage/(a[i]*refVoltage))-1); // Calculate the resistance
-      sample_values[i] = (1 / ( 8.294e-4 + 2.624e-4*log(r) + 1.369e-7*pow(log(r), 3) )) - 273.15;
+      sample_values[i] = (1 / ( 8.7561e-4 + 2.5343e-4*log(r) + 1.84499e-7*pow(log(r), 3) )) - 273.15;
     }
 
     // print analog outputs to serial
