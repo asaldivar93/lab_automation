@@ -2,7 +2,7 @@
 #include "MCP_ADC.h"
 
 boolean         newCommand = false;
-String          ADDRESS = "r01";
+String          ADDRESS = "r101";
 String          inputString = "";
 
 unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog imputs
@@ -15,9 +15,11 @@ uint32_t        sample_time = 1000000 / sample_per_second;
 boolean         READING = false;
 float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
-int             resistorReference = 10000;
+int             resistorReference = 10000; // Vaulue of the termistor reference resistor in series
+float           voltage_acs712; // variable to store voltage value from acs712 current sensor
+float           total_current; // variable to store total current
 
-float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0}; // Set point for PWM output
+float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 255}; // Set point for PWM output
 
 #define MCP_DOUT 18
 #define MCP_DIN  19
@@ -35,7 +37,7 @@ float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 0}; // Set point for PWM outp
 
 #define LEDC_BIT 8
 
-#define LEDC_BASE_FREQ 5000
+#define LEDC_BASE_FREQ 800
 
 #define HEATER_PIN_0 13
 #define HEATER_PIN_1 12
@@ -110,25 +112,24 @@ void loop() {
 
     // Channel 0 is conected to the ouput of a photodiode - transimpedance
     // amplifier used to measure infrared light reflected by biomass
-    sample_values[0] = analog[0] / sample_number;
+    sample_values[0] = analog[0] / sample_number * (refVoltage / 4095);
 
     // Channels 1 and 2 have a 220ohm connected to ground
     // to record ph and dissolved oxygen
-    sample_values[1] = analog[0] / sample_number;
-    sample_values[2] = analog[0] / sample_number;
+    sample_values[1] = analog[1] / sample_number;
+    sample_values[2] = analog[2] / sample_number;
 
-    // Channels 6 and 7 do not have resistors at the moment
-    // these channels can be used to recieve analog outputs from
-    // conditioned signals (eg, MQ-4)
-    sample_values[6] = analog[0] / sample_number;
-    sample_values[7] = analog[0] / sample_number;
+    // Channel 7 has a ACS712 hall effect current sensor
+    voltage_acs712 = (analog[7] / sample_number) * (refVoltage / 4095);
+    total_current = (voltage_acs712 - 2.5012) / -0.067;
+    sample_values[7] = total_current;
 
     // S-H equation for thin film resistor
-    sample_values[i] = (1 / ( 8.294e-4 + 2.624e-4*log(r) + 1.369e-7*pow(log(r), 3) )) - 273.15;
+    // sample_values[i] = (1 / ( 8.294e-4 + 2.624e-4*log(r) + 1.369e-7*pow(log(r), 3) )) - 273.15;
 
-    // Channels 3, 4, and 5 have 10Kohm resistors connected to 3.3V
+    // Channels 3, 4, 5, 6 have 10Kohm resistors connected to 3.3V
     // to record temperature from a 10Kohm NTC termistor
-    for (byte i = 3; i < 6; i++) {
+    for (byte i = 3; i < 7; i++) {
       a[i] = analog[i] / sample_number; // dummy variable
       // S-H equation for water resistant termistor
       float r = resistorReference/((4095*inputVoltage/(a[i]*refVoltage))-1); // Calculate the resistance
@@ -138,7 +139,7 @@ void loop() {
     // print analog outputs to serial
     String sample = ADDRESS + " ";
     for(byte i = 0; i < ADC1.channels(); i++){
-      sample = sample + "," + (String) sample_values[i];
+      sample = sample + "," + String(sample_values[i], 3);
     }
     sample = sample + ",115,!";
     Serial.println(sample);
