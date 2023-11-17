@@ -30,9 +30,10 @@ float           ph;
 float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 255}; // Set point for PWM output
 float           temp_setpoint = 0;
 float           temp_reactor;
+bool            FEED_ON = false;
 float           Kp = 100;
-float           Ki = 0.002;
-float           Kd = 0;
+float           Ki = 2.5;
+float           Kd = 50;
 
 #define MCP_DOUT 18
 #define MCP_DIN  19
@@ -136,8 +137,13 @@ void loop() {
 
     // Channels 1 and 2 have a 220ohm connected to ground
     // to record ph and dissolved oxygen
-    sample_values[1] = analog[1] / sample_number;
-    sample_values[2] = analog[2] / sample_number;
+    voltage_oxygen = analog[1] / sample_number * (refVoltage / 4095);
+    oxygen = 0.4558 * voltage_oxygen;
+    sample_values[1] = oxygen;
+
+    voltage_ph = analog[2] / sample_number * (refVoltage / 4095);
+    ph = 3.9811 * voltage_ph - 3.5106;
+    sample_values[2] = analog[2] / sample_number * (refVoltage / 4095);
 
     // Channel 7 has a ACS712 hall effect current sensor
     voltage_acs712 = (analog[7] / sample_number) * (refVoltage / 4095);
@@ -162,20 +168,20 @@ void loop() {
     ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
 
     // Start
-//    if(oxygen < oxygen_bounds[0]){
-//      FEED_ON = true;
-//    }
-//    if(oxygen > oxygen_bounds[1]){
-//      FEED_ON = false
-//    }
-//    if(FEED_ON){
-//      setpoint[1] = 255
-//      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
-//    }
-//    else{
-//      setpoint[1] = 0
-//      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
-//    }
+    if(oxygen < oxygen_bounds[0]){
+      FEED_ON = true;
+    }
+    if(oxygen > oxygen_bounds[1]){
+      FEED_ON = false;
+    }
+    if(FEED_ON){
+      setpoint[1] = 255;
+      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
+    }
+    else{
+      setpoint[1] = 0;
+      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
+    }
     
     // print analog outputs to serial
     String sample = ADDRESS + " ";

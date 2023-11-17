@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="r101", baud=230400
 )
-experiment_name = "test"
+experiment_name = "20231611_pruebaestatica"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -48,46 +48,54 @@ print('Experiment Started')
 start_time = datetime.now()
 while(True):
     # Every time there is a serial input
-    if (recorder.sp.inWaiting() > 0):
-        # Get rpm from serial string
-        data = recorder.read()
-        samples += 1
-        # Record Time
-        date = datetime.now()  # Date
-        time_delta = date - start_time  # Time since experiment started
-        time = time_delta.days * 24 + time_delta.seconds  # Time in seconds
+    try:
+        if (recorder.sp.inWaiting() > 0):
+            # Get rpm from serial string
+            data = recorder.read()
+            samples += 1
+            # Record Time
+            date = datetime.now()  # Date
+            time_delta = date - start_time  # Time since experiment started
+            time = time_delta.days * 24 + time_delta.seconds  # Time in seconds
 
-        # Set the PWM output
-        pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-        pwm_values = [pwm for pwm in pwm_values['pwm']]
-        if not last_pwm == pwm_values:
-            recorder.update_pumps(pwm_values)
-            last_pwm_values = pwm_values
+            # Set the PWM output
+            pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
+            pwm_values = [pwm for pwm in pwm_values['pwm']]
+            if not last_pwm == pwm_values:
+                recorder.update_pumps(pwm_values)
+                last_pwm_values = pwm_values
 
-        # Set the temperature setpoint
-        temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
-        temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
-        if not last_setpoint == temp_setpoint:
-            recorder.update_temp_setpoint(temp_setpoint)
-            last_setpoint = temp_setpoint
+            # Set the temperature setpoint
+            temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
+            temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
+            if not last_setpoint == temp_setpoint:
+                recorder.update_temp_setpoint(temp_setpoint)
+                last_setpoint = temp_setpoint
 
-        oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
-        oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
-        if not last_bounds == oxygen_bounds:
-            recorder.update_oxygen_bounds(oxygen_bounds)
-            last_bounds = oxygen_bounds
+            oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
+            oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
+            if not last_bounds == oxygen_bounds:
+                recorder.update_oxygen_bounds(oxygen_bounds)
+                last_bounds = oxygen_bounds
 
-        # Dump Data to file
-        if samples >= sample_frecuency:
-            with open(results_file, 'a+') as file:
-                pd.DataFrame(
-                    [[date.strftime("%d-%m-%Y_%H-%M-%S"), time,
-                     data[0], data[1], data[2],
-                     data[3], data[4], data[5],
-                     data[6], data[7], data[8], data[9]]],
-                    columns=['Date', 'Time',
-                             'Biomass', 'Dissolved_oxygen', 'pH',
-                             'T_reactor', 'T_cooling_liquid', 'T_peltier',
-                             'T_mosfet', 'Power', 'PWM_feed', 'PWM_heater'],
-                ).to_csv(file, index=False, header=False)
-            samples = 0
+            # Dump Data to file
+            if samples >= sample_frecuency:
+                with open(results_file, 'a+') as file:
+                    pd.DataFrame(
+                        [[date.strftime("%d-%m-%Y_%H-%M-%S"), time,
+                         data[0], data[1], data[2],
+                         data[3], data[4], data[5],
+                         data[6], data[7], data[8], data[9]]],
+                        columns=['Date', 'Time',
+                                 'Biomass', 'Dissolved_oxygen', 'pH',
+                                 'T_reactor', 'T_cooling_liquid', 'T_peltier',
+                                 'T_mosfet', 'Power', 'PWM_feed', 'PWM_heater'],
+                    ).to_csv(file, index=False, header=False)
+                samples = 0
+    except OSError as e:
+        print(e)
+        print("Microcontroler disconnected, establishing connection...")
+        recorder = arduino.sensors(
+            ADDRESS="r101", baud=230400
+        )
+          

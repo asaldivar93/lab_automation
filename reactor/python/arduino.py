@@ -23,7 +23,7 @@ class sensors(object):
         self.sp = serial.Serial(port=port, baudrate=baud, timeout=2)
         self.sp.flushInput()
         self.sp.flushOutput()
-        time.sleep(2)
+        time.sleep(0.5)
 
     def get(self):
         cmd_str = self.build_cmd_str('2', '')

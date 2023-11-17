@@ -11,7 +11,7 @@ import matplotlib.pyplot as plot
 import pandas as pd
 
 # Initialize figure
-experiment = 'test'
+experiment = '20231611_pruebaestatica' 
 figure = plot.figure(constrained_layout=True)
 grid = figure.add_gridspec(4, 4)
 
