@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="r101", baud=230400
 )
-experiment_name = "20231611_pruebaestatica"
+experiment_name = "20231122_cinetica"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -49,7 +49,7 @@ start_time = datetime.now()
 while(True):
     # Every time there is a serial input
     try:
-        if (recorder.sp.inWaiting() > 0):
+        if (recorder.serial_port.inWaiting() > 0):
             # Get rpm from serial string
             data = recorder.read()
             samples += 1
@@ -94,8 +94,23 @@ while(True):
                 samples = 0
     except OSError as e:
         print(e)
-        print("Microcontroler disconnected, establishing connection...")
-        recorder = arduino.sensors(
-            ADDRESS="r101", baud=230400
-        )
+        recorder.reconnect()
+
+        # Reset Set points
+        pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
+        pwm_values = [pwm for pwm in pwm_values['pwm']]
+        recorder.update_pumps(pwm_values)
+        last_pwm_values = pwm_values
+
+        
+        temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
+        temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
+        recorder.update_temp_setpoint(temp_setpoint)
+        last_setpoint = temp_setpoint
+
+        oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
+        oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
+        recorder.update_oxygen_bounds(oxygen_bounds)
+        last_bounds = oxygen_bounds
+    
           

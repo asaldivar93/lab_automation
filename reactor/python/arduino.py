@@ -6,9 +6,12 @@ Created on Mon Oct  7 20:19:46 2019
 @author: Alexis
 """
 
+from serial.tools import list_ports
+
 import time
 import numpy as np
 import serial
+
 
 
 class sensors(object):
@@ -20,26 +23,54 @@ class sensors(object):
     ):
         print('Opening connection')
         self.ADDRESS = ADDRESS
-        self.sp = serial.Serial(port=port, baudrate=baud, timeout=2)
-        self.sp.flushInput()
-        self.sp.flushOutput()
+        self.port = port
+        self.baud = baud
+        self.serial_port = serial.Serial(
+            port=self.port, baudrate=self.baud, timeout=2
+        )
+        self.serial_port.flushInput()
+        self.serial_port.flushOutput()
         time.sleep(0.5)
-
+    
+    def reconnect(self):
+        
+        time.sleep(1)
+        self.serial_port.close()
+        time.sleep(2)
+        print("Serial Port Closed")
+        self.serial_port = None
+        
+        while self.serial_port == None:
+            time.sleep(5)
+            print('Opening connection')
+            try:
+                ports = list_ports.comports()
+                port = ports[0].device
+                self.serial_port = serial.Serial(
+                    port=self.port, baudrate=self.baud, timeout=2
+                )
+            except IndexError:
+                print("Line connection Lost")
+        self.serial_port.flushInput()
+        self.serial_port.flushOutput()
+        print("Device Connected")
+        time.sleep(0.5)
+    
     def get(self):
         cmd_str = self.build_cmd_str('2', '')
         try:
-            self.sp.write(cmd_str.encode())
-            self.sp.flushInput()
+            self.serial_port.write(cmd_str.encode())
+            self.serial_port.flushInput()
         except Exception:
             return None
-        return self.sp.readline().decode('UTF-8')
+        return self.serial_port.readline().decode('UTF-8')
 
     def readline_(self):
-        return self.sp.readline().decode('UTF-8')
+        return self.serial_port.readline().decode('UTF-8')
 
     def read(self):
-        data = self.sp.readline().decode('UTF-8')
-        self.sp.flushInput()
+        data = self.serial_port.readline().decode('UTF-8')
+        self.serial_port.flushInput()
         data = data.split(" ")[1].split(",")[1:-2]
 
         return np.asarray(data, dtype=np.float64, order='C')
@@ -59,8 +90,8 @@ class sensors(object):
     def write(self, cmd, pwm):
         cmd_str = self.build_cmd_str(cmd, pwm)
         try:
-            self.sp.write(cmd_str.encode())
-            self.sp.flush()
+            self.serial_port.write(cmd_str.encode())
+            self.serial_port.flush()
         except:
             return None
         return None
