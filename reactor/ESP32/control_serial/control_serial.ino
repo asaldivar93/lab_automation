@@ -31,9 +31,9 @@ float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 255}; // Set point for PWM ou
 float           temp_setpoint = 0;
 float           temp_reactor;
 bool            FEED_ON = false;
-float           Kp = 100;
-float           Ki = 2.5;
-float           Kd = 50;
+float           Kp = 60;
+float           Ki = 1.5;
+float           Kd = 0.3;
 
 #define MCP_DOUT 18
 #define MCP_DIN  19
@@ -143,7 +143,7 @@ void loop() {
 
     voltage_ph = analog[2] / sample_number * (refVoltage / 4095);
     ph = 3.9811 * voltage_ph - 3.5106;
-    sample_values[2] = analog[2] / sample_number * (refVoltage / 4095);
+    sample_values[2] = ph;
 
     // Channel 7 has a ACS712 hall effect current sensor
     voltage_acs712 = (analog[7] / sample_number) * (refVoltage / 4095);
@@ -174,13 +174,15 @@ void loop() {
     if(oxygen > oxygen_bounds[1]){
       FEED_ON = false;
     }
-    if(FEED_ON){
-      setpoint[1] = 255;
-      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
-    }
-    else{
-      setpoint[1] = 0;
-      ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
+    switch(FEED_ON){
+      case true:
+        setpoint[2] = 150;
+        ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
+        break;
+      case false:
+        setpoint[2] = 0;
+        ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
+        break;
     }
     
     // print analog outputs to serial
@@ -188,7 +190,7 @@ void loop() {
     for(byte i = 0; i < ADC1.channels(); i++){
       sample = sample + "," + String(sample_values[i], 3);
     }
-    sample = sample + "," + String(setpoint[1]);
+    sample = sample + "," + String(setpoint[2]);
     sample = sample + "," + String(setpoint[3]);
     sample = sample + ",115,!";
     Serial.println(sample);
@@ -237,7 +239,9 @@ void parseString(String inputString){
           lastcomma = nextcomma;
         }
         ledcWrite(LEDC_CHANNEL_0, setpoint[0]);
-        ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
+        ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
+        // ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
+        // ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
         ledcWrite(LEDC_CHANNEL_4, setpoint[4]);
         ledcWrite(LEDC_CHANNEL_5, setpoint[5]);
         ledcWrite(LEDC_CHANNEL_6, setpoint[6]);

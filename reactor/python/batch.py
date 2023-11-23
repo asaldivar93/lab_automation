@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="r101", baud=230400
 )
-experiment_name = "20231122_cinetica"
+experiment_name = "20231123_cinetica"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -60,23 +60,17 @@ while(True):
 
             # Set the PWM output
             pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-            pwm_values = [pwm for pwm in pwm_values['pwm']]
-            if not last_pwm == pwm_values:
-                recorder.update_pumps(pwm_values)
-                last_pwm_values = pwm_values
+            pwm_values = [pwm for pwm in pwm_values['pwm']]         
+            recorder.update_pumps(pwm_values)
 
             # Set the temperature setpoint
             temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
             temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
-            if not last_setpoint == temp_setpoint:
-                recorder.update_temp_setpoint(temp_setpoint)
-                last_setpoint = temp_setpoint
+            recorder.update_temp_setpoint(temp_setpoint)
 
             oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
             oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
-            if not last_bounds == oxygen_bounds:
-                recorder.update_oxygen_bounds(oxygen_bounds)
-                last_bounds = oxygen_bounds
+            recorder.update_oxygen_bounds(oxygen_bounds)
 
             # Dump Data to file
             if samples >= sample_frecuency:

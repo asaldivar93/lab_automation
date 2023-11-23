@@ -18,7 +18,7 @@ Inicio alimentacion Bolsas:
 Tiempo fuera de linea:
     Hora de inicio: 23-11-2023 15:24
     Hora fin: 23-11-2023 15:33
-    Continua en: 20231123_cinetica
+    esta cinetica empieza en: 20231122_cinetica
     Motivo: actualizacion firmware oxygen_bounds
 
-23-11-2023 14:00 aprox. Toma de muestra
+23-11-2023 Alimentacion de bolsas encendida manualmente durante 5min entre las 16:05 y 16:10
