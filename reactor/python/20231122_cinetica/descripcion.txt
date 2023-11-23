@@ -1,0 +1,16 @@
+Reactor Cinetica ch4 + h2
+Vol. operacion = 1.5L approx
+Alimentacion:
+    Dos bolsas:
+        ch4 30%
+        h2 20%
+    Total:
+        ch4 15%
+        h2  10%
+
+Inoculacion: 
+    Fecha: 21-11-2023 
+    Hora:
+Inicio alimentacion Bolsas: 
+    Fecha: 22-11-2023
+    Hora:  18:06
