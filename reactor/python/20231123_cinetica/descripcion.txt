@@ -21,4 +21,7 @@ Tiempo fuera de linea:
     esta cinetica empieza en: 20231122_cinetica
     Motivo: actualizacion firmware oxygen_bounds
 
-23-11-2023 Alimentacion de bolsas encendida manualmente durante 5min entre las 16:05 y 16:10
+23-11-2023  Alimentacion de bolsas encendida manualmente durante 5min entre las 16:05 y 16:10
+24-11-2023  12:48 Toma de muestra de gas mediante la recirculacion y liquida
+            13:50 Cambio de Bolsa de Metano
+            13:55 Alimentacion de gas encendidad Manualmente 5.5min

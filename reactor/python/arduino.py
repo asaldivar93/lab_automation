@@ -7,6 +7,7 @@ Created on Mon Oct  7 20:19:46 2019
 """
 
 from serial.tools import list_ports
+from serial.serialutil import SerialException
 
 import time
 import numpy as np
@@ -25,9 +26,17 @@ class sensors(object):
         self.ADDRESS = ADDRESS
         self.port = port
         self.baud = baud
-        self.serial_port = serial.Serial(
-            port=self.port, baudrate=self.baud, timeout=2
-        )
+        try:
+            self.serial_port = serial.Serial(
+                port=self.port, baudrate=self.baud, timeout=2
+            )
+        except SerialException:
+            ports = list_ports.comports()
+            self.port = ports[0].device
+            self.serial_port = serial.Serial(
+                port=self.port, baudrate=self.baud, timeout=2
+            )
+            
         self.serial_port.flushInput()
         self.serial_port.flushOutput()
         time.sleep(0.5)
@@ -45,7 +54,7 @@ class sensors(object):
             print('Opening connection')
             try:
                 ports = list_ports.comports()
-                port = ports[0].device
+                self.port = ports[0].device
                 self.serial_port = serial.Serial(
                     port=self.port, baudrate=self.baud, timeout=2
                 )
