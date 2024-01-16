@@ -13,7 +13,7 @@ print('Initializing')
 recorder = arduino.sensors(
     ADDRESS="r101", baud=230400
 )
-experiment_name = "20231123_cinetica"
+experiment_name = "20231218_calibracion_pid_temp2"
 dir_string = experiment_name
 os.mkdir(dir_string)
 results_file = dir_string + '/data.csv'
@@ -22,7 +22,7 @@ results_file = dir_string + '/data.csv'
 with open(results_file, 'w+') as file:
     pd.DataFrame(
         columns=['Date', 'Time', 'Biomass', 'Dissolved_oxygen', 'pH',
-                 'T_reactor', 'T_cooling_liquid', 'T_peltier', 'T_mosfet',
+                 'T_heater', 'T_liquid', 'T_sensor', 'T_amb',
                  'Power', 'PWM_feed', 'PWM_heater'],
     ).to_csv(file, index=False)
 
@@ -40,12 +40,20 @@ recorder.update_oxygen_bounds(last_bounds)
 
 # If samples are sent from arduino every 0.250 seconds
 # the samples per second are 4 * sample_frecuency
-sample_frecuency = 20
-samples = 19
+sample_frecuency = 1
+samples = 0
+
+# PWM ch1 timer
+pwm_time_off = 5 * 60
+pwm_time_on = 30
+pwm_last_time = datetime.now()
+timer = pwm_time_on
+PUMP_ON = True
 
 # Infinite loop
 print('Experiment Started')
 start_time = datetime.now()
+last_time = start_time
 while(True):
     # Every time there is a serial input
     try:
@@ -56,11 +64,24 @@ while(True):
             # Record Time
             date = datetime.now()  # Date
             time_delta = date - start_time  # Time since experiment started
-            time = time_delta.days * 24 + time_delta.seconds  # Time in seconds
-
+            time = (time_delta.days * 24 * 3600) + time_delta.seconds  # Time in seconds
+            
             # Set the PWM output
             pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-            pwm_values = [pwm for pwm in pwm_values['pwm']]         
+            pwm_values = [pwm for pwm in pwm_values['pwm']]
+            
+            pwm_delta_time = date - pwm_last_time
+            pwm_delta_time = pwm_delta_time.seconds
+            if pwm_delta_time > timer:
+                PUMP_ON = not PUMP_ON
+                pwm_last_time = datetime.now()
+            if PUMP_ON:
+                pwm_values[1] = 150
+                timer = pwm_time_on
+            else:
+                pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
+                pwm_values = [pwm for pwm in pwm_values['pwm']]
+                timer = pwm_time_off
             recorder.update_pumps(pwm_values)
 
             # Set the temperature setpoint
@@ -80,10 +101,9 @@ while(True):
                          data[0], data[1], data[2],
                          data[3], data[4], data[5],
                          data[6], data[7], data[8], data[9]]],
-                        columns=['Date', 'Time',
-                                 'Biomass', 'Dissolved_oxygen', 'pH',
-                                 'T_reactor', 'T_cooling_liquid', 'T_peltier',
-                                 'T_mosfet', 'Power', 'PWM_feed', 'PWM_heater'],
+                        columns=['Date', 'Time', 'Biomass', 'Dissolved_oxygen', 'pH',
+                                 'T_heater', 'T_liquid', 'T_sensor', 'T_amb',
+                                 'Power', 'PWM_feed', 'PWM_heater'],
                     ).to_csv(file, index=False, header=False)
                 samples = 0
     except OSError as e:

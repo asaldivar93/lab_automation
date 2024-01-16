@@ -25,3 +25,5 @@ Tiempo fuera de linea:
 24-11-2023  12:48 Toma de muestra de gas mediante la recirculacion y liquida
             13:50 Cambio de Bolsa de Metano
             13:55 Alimentacion de gas encendidad Manualmente 5.5min
+28-11-2023  12:50 Revision de perdida de inoculo aprox 200 mL 
+29-11-2023  14:52 Cambio de Bolsa de Metano 

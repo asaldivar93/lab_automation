@@ -15,6 +15,7 @@ uint32_t        sample_per_second = 4;
 uint32_t        sample_time = 1000000 / sample_per_second;
 float           sample_time_seconds = 1000000 / (float) sample_per_second / 1000000;
 
+// Measurment Variables
 boolean         READING = false;
 float           inputVoltage = 3.3;
 float           refVoltage = 3.3;
@@ -23,23 +24,28 @@ float           voltage_acs712; // variable to store voltage value from acs712 c
 float           total_current; // variable to store total current
 float           voltage_oxygen;
 float           oxygen;
-float           oxygen_bounds[2] = {0.01, 0.1};
 float           voltage_ph;
 float           ph;
 
+// Setpoints Variables
+float           oxygen_bounds[2] = {0.01, 0.1};
 float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 255}; // Set point for PWM output
 float           temp_setpoint = 0;
 float           temp_reactor;
 bool            FEED_ON = false;
-float           Kp = 60;
-float           Ki = 1.5;
-float           Kd = 0.3;
 
+// PID values
+float           Kp = 100;
+float           Ki = 0.2;
+float           Kd = 0.;
+
+// Communication pins to MCP3208 ADC
 #define MCP_DOUT 18
 #define MCP_DIN  19
 #define MCP_CLK  5
 #define CS1      23
 
+// PWM CHANNELS
 #define LEDC_CHANNEL_0 0
 #define LEDC_CHANNEL_1 1
 #define LEDC_CHANNEL_2 2
@@ -49,10 +55,11 @@ float           Kd = 0.3;
 #define LEDC_CHANNEL_6 6
 #define LEDC_CHANNEL_7 7
 
+// PWM PARAMETERS
 #define LEDC_BIT 8
-
 #define LEDC_BASE_FREQ 800
 
+// PWM
 #define HEATER_PIN_0 13
 #define HEATER_PIN_1 12
 #define HEATER_PIN_2 14
@@ -62,28 +69,38 @@ float           Kd = 0.3;
 #define HEATER_PIN_6 33
 #define HEATER_PIN_7 32
 
+// MCP Object
 MCP3208 ADC1(MCP_DOUT, MCP_DIN, MCP_CLK);
 
-QuickPID PID_0(&temp_reactor, &setpoint[3], &temp_setpoint); // Heater should be connected to channel 3
+// PID Object
+QuickPID PID_0(&temp_reactor, &setpoint[3], &temp_setpoint
+               PID_0.iAwMode::iAwClamp); // Heater should be connected to channel 3
 
+// Timer Callback function
 esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
-
 void read_temp(void *p) {
-  READING = true;           // Change flag to enable print
+  READING = true;
 }
 
 void setup() {
   Serial.begin(230400);
 
+  // MCP3208 instance
   ADC1.begin(CS1);
   ADC1.setSPIspeed(1000000);
 
+  // PID Instance
   PID_0.SetMode(PID_0.Control::automatic);
   PID_0.SetOutputLimits(0, 255);
   PID_0.SetTunings(Kp, Ki, Kd);
   PID_0.SetSampleTimeUs(sample_time);
-  
+  PID_0.Set
+
+  // PWM Setup
+  // Reacirculation Pumps are connected to Channel !
+  // Feeding Pump is connected to Channel 2
+  // Heating Blanket is connected to Channel ·
   ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_1, LEDC_BASE_FREQ, LEDC_BIT);
   ledcSetup(LEDC_CHANNEL_2, LEDC_BASE_FREQ, LEDC_BIT);
@@ -102,6 +119,7 @@ void setup() {
   ledcAttachPin(HEATER_PIN_6, LEDC_CHANNEL_6);
   ledcAttachPin(HEATER_PIN_7, LEDC_CHANNEL_7);
 
+  // PWM initialization
   ledcWrite(LEDC_CHANNEL_0, setpoint[0]);
   ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
   ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
@@ -112,6 +130,7 @@ void setup() {
   ledcWrite(LEDC_CHANNEL_7, setpoint[7]);
   delay(500);
 
+  // Start Timer
   create_args.callback = read_temp; // Set esp-timer argument
   esp_timer_create(&create_args, &timer_handle);
   esp_timer_start_once(timer_handle, sample_time);
@@ -121,6 +140,7 @@ void loop() {
 
   if (!READING){
     // Between sampling times accumulate the analog values
+    // Moving Average Filter
     for (byte i = 0; i < ADC1.channels(); i++) {
       analog[i] += ADC1.analogRead(i);
     }
@@ -163,11 +183,11 @@ void loop() {
     }
 
     // Compute PID values for temperature control
-    temp_reactor = sample_values[3];
+    temp_reactor = sample_values[4];
     PID_0.Compute();
     ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
 
-    // Start
+    // Turn Feeding pump ON or OFF
     if(oxygen < oxygen_bounds[0]){
       FEED_ON = true;
     }
@@ -184,7 +204,7 @@ void loop() {
         ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
         break;
     }
-    
+
     // print analog outputs to serial
     String sample = ADDRESS + " ";
     for(byte i = 0; i < ADC1.channels(); i++){
@@ -201,6 +221,7 @@ void loop() {
     }
     sample_number = 0;
 
+    // Restart Timer
     esp_timer_start_once(timer_handle, sample_time);
     READING = false;
   }
