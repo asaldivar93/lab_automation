@@ -40,15 +40,21 @@ recorder.update_oxygen_bounds(last_bounds)
 
 # If samples are sent from arduino every 0.250 seconds
 # the samples per second are 4 * sample_frecuency
-sample_frecuency = 1
-samples = 0
+sample_frecuency = 20
+samples = 19
 
-# PWM ch1 timer
-pwm_time_off = 5 * 60
-pwm_time_on = 30
-pwm_last_time = datetime.now()
-timer = pwm_time_on
-PUMP_ON = True
+# PWM timers
+pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
+pwm_timers = pwm_values.query('timer>0')
+pwm_last_time = pd.Series(dtype=float)
+pwm_delta_time = pd.Series(dtype=float)
+timer = pd.Series(dtype=str)
+PWM_ON = pd.Series(dtype=bool)
+for channel in pwm_values.index:
+    PWM_ON.loc[channel] = True
+    timer.loc[channel] = pwm_values.loc[channel, "time_on"]
+    pwm_last_time.loc[channel] = datetime.now()
+    pwm_delta_time.loc[channel] = 0
 
 # Infinite loop
 print('Experiment Started')
@@ -64,24 +70,26 @@ while(True):
             # Record Time
             date = datetime.now()  # Date
             time_delta = date - start_time  # Time since experiment started
-            time = (time_delta.days * 24 * 3600) + time_delta.seconds  # Time in seconds
-            
+            time = (time_delta.days * 24 * 3600) + time_delta.seconds + time_delta.microseconds / 1e6  # Time in seconds
+
             # Set the PWM output
             pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
+            pwm_timers = pwm_values.query('timer>0')
             pwm_values = [pwm for pwm in pwm_values['pwm']]
-            
-            pwm_delta_time = date - pwm_last_time
-            pwm_delta_time = pwm_delta_time.seconds
-            if pwm_delta_time > timer:
-                PUMP_ON = not PUMP_ON
-                pwm_last_time = datetime.now()
-            if PUMP_ON:
-                pwm_values[1] = 150
-                timer = pwm_time_on
-            else:
-                pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-                pwm_values = [pwm for pwm in pwm_values['pwm']]
-                timer = pwm_time_off
+            for channel in pwm_timers.index:
+                delta = date - pwm_last_time[channel]
+                pwm_delta_time[channel] = delta.seconds + delta.microseconds / 1e6
+
+                if pwm_delta_time[channel] > timer[channel]:
+                    PWM_ON[channel] = not PWM_ON[channel]
+                    pwm_last_time[channel] = datetime.now()
+                    print(channel, list(PWM_ON))
+
+                if PWM_ON[channel]:
+                    timer[channel] = pwm_timers.loc[channel, "time_on"]
+                else:
+                    pwm_values[channel] = 0
+                    timer[channel] = pwm_timers.loc[channel, "time_off"]
             recorder.update_pumps(pwm_values)
 
             # Set the temperature setpoint
@@ -89,6 +97,7 @@ while(True):
             temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
             recorder.update_temp_setpoint(temp_setpoint)
 
+            # Set the oxygen_bounds setpoint
             oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
             oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
             recorder.update_oxygen_bounds(oxygen_bounds)
@@ -116,7 +125,6 @@ while(True):
         recorder.update_pumps(pwm_values)
         last_pwm_values = pwm_values
 
-        
         temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
         temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
         recorder.update_temp_setpoint(temp_setpoint)
@@ -126,5 +134,3 @@ while(True):
         oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
         recorder.update_oxygen_bounds(oxygen_bounds)
         last_bounds = oxygen_bounds
-    
-          

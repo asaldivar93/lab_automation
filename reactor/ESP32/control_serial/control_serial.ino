@@ -260,9 +260,9 @@ void parseString(String inputString){
           lastcomma = nextcomma;
         }
         ledcWrite(LEDC_CHANNEL_0, setpoint[0]);
-        ledcWrite(LEDC_CHANNEL_1, setpoint[1]);
-        // ledcWrite(LEDC_CHANNEL_2, setpoint[2]);
-        // ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
+        ledcWrite(LEDC_CHANNEL_1, setpoint[1]); // Recirculacion
+        ledcWrite(LEDC_CHANNEL_2, setpoint[2]); Alimentacion
+        // ledcWrite(LEDC_CHANNEL_3, setpoint[3]); //
         ledcWrite(LEDC_CHANNEL_4, setpoint[4]);
         ledcWrite(LEDC_CHANNEL_5, setpoint[5]);
         ledcWrite(LEDC_CHANNEL_6, setpoint[6]);

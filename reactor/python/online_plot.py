@@ -11,7 +11,7 @@ import matplotlib.pyplot as plot
 import pandas as pd
 
 # Initialize figure
-experiment = '20231218_calibracion_pid_temp2' 
+experiment = '20231218_calibracion_pid_temp2'
 figure = plot.figure(constrained_layout=True)
 grid = figure.add_gridspec(4, 4)
 
@@ -56,7 +56,7 @@ def update(i):
     T_amb = data.loc[:, "T_amb"]
     biomass = data.loc[:, "PWM_heater"]
     oxygen = data.loc[:, "Dissolved_oxygen"]
-    ph = data.loc[:, "Power"]
+    ph = data.loc[:, "pH"]
 
     ln_T_heater.set_data(time, T_heater)
     ln_T_liquid.set_data(time, T_liquid)

@@ -1,9 +1,8 @@
-Channel,pwm
-0,0
-1,0
-2,0
-3,0
-4,0
-5,0
-6,0
-7,255
+Channel,pwm,timer,time_on,time_off
+0,0,False,0,0
+1,150,True,30,300
+2,0,False,0,0
+4,0,False,0,0
+5,0,False,5,5
+6,0,False,0,0
+7,255,False,0,0
