@@ -5,8 +5,6 @@ from scipy.integrate import odeint
 from scipy.optimize import minimize
 from scipy.linalg import expm
 
-from filterpy.common import van_loan_discretization
-
 import pandas as pd
 import numpy as np
 import json
@@ -419,7 +417,7 @@ new_parameters = minimize(
 )
 simulation = simulate_statespace(list(new_parameters.x))
 simulation = simulate_statespace3(list(new_parameters.x))
-simulation = simulate_statespace4(list(new_parameters.x))
+simulation = simulate_statespace4(list(parameters))
 
 a11 = -2.60555105e-02
 a12 = 1.93486978e-02
@@ -454,29 +452,34 @@ def simulate_control(parameters, kp, ki):
         np.dot(E, eD), np.linalg.inv(E)
     )
 
-    initial_conditions = [25, 25]
+    initial_conditions = [25., 25.]
     simulation_results = pd.DataFrame(
         columns=["Time", "T_heater", "T_liquid", "u", "P", "I"]
     )
     simulation_results.loc[0, "Time"] = 0
     simulation_results.loc[0, "T_heater"] = initial_conditions[0]
     simulation_results.loc[0, "T_liquid"] = initial_conditions[1]
+    simulation_results.loc[0, "T_heater_f"] = initial_conditions[0]
+    simulation_results.loc[0, "T_liquid_f"] = initial_conditions[0]
     simulation_results.loc[0, "u"] = 0
 
-    time_span = 10000 * 2
+    time_span = 10000
     dt = 0.250
     iters = int((time_span / dt) + 1)
     time = np.linspace(0, time_span, iters)
     I = np.zeros(iters)
     u = np.zeros(iters)
-
+    sys_noise_filter = np.zeros([2,2])
+    sys_noise_filter[0] = initial_conditions
+    alpha_filter = 0.01
     for iter in range(1, iters):
         time_interval = [0, dt]
         sys_update = statespace_solver(
             initial_conditions, time_interval, dt_s, F, B, [u[iter - 1], 22]
         )
-        sys_noise = sys_update[-1] + np.array([np.random.normal(0, 0.025), np.random.normal(0, 0.025)])
-        input = sys_noise[1]
+        sys_noise = sys_update[-1] + np.array([np.random.normal(0, 0.25), np.random.normal(0, 0.25)])
+        sys_noise_filter[1] = alpha_filter * sys_noise + (1 - alpha_filter) * sys_noise_filter[0]
+        input = sys_noise_filter[1, 1]
         error = 50 - input
         P = kp * error
         I[iter] = I[iter - 1] + ki * error * dt
@@ -487,10 +490,12 @@ def simulate_control(parameters, kp, ki):
         if u[iter] < 0:
             u[iter] = 0
             I[iter] = I[iter - 1]
-
+        sys_noise_filter[0] = sys_noise_filter[1]
         simulation_results.loc[iter, "Time"] = time[iter]
         simulation_results.loc[iter, "T_heater"] = sys_noise[0]
         simulation_results.loc[iter, "T_liquid"] = sys_noise[1]
+        simulation_results.loc[iter, "T_heater_f"] = sys_noise_filter[1, 0]
+        simulation_results.loc[iter, "T_liquid_f"] = sys_noise_filter[1, 1]
         simulation_results.loc[iter, "P"] = P
         simulation_results.loc[iter, "I"] = I[iter]
         simulation_results.loc[iter, "u"] = u[iter]
@@ -502,7 +507,8 @@ def simulate_control(parameters, kp, ki):
 # %%codecell
 control = simulate_control(parameters, 100, 0.2)
 pl.line(control, x="Time", y="u")
-pl.line(control, x="Time", y="T_liquid")
+pl.line(control, x="Time", y=["T_liquid", "T_liquid_f"])
+control.loc[:, "T_liquid"] = control.loc[:, "T_liquid"].astype(float)
 
 
 

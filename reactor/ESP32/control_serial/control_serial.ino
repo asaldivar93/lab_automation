@@ -6,7 +6,7 @@ boolean         newCommand = false;
 String          ADDRESS = "r101";
 String          inputString = "";
 
-unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog imputs
+unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
 float           sample_values[8]; // Variable to store analog values after transformation
 float           a[8]; // dummy variable for termistor resistance value calculation
 float           sample_number;
@@ -31,6 +31,7 @@ float           ph;
 float           oxygen_bounds[2] = {0.01, 0.1};
 float           setpoint[] = {0, 0, 0, 0, 0, 0, 0, 255}; // Set point for PWM output
 float           temp_setpoint = 0;
+float           temp_filter;
 float           temp_reactor;
 bool            FEED_ON = false;
 
@@ -95,7 +96,6 @@ void setup() {
   PID_0.SetOutputLimits(0, 255);
   PID_0.SetTunings(Kp, Ki, Kd);
   PID_0.SetSampleTimeUs(sample_time);
-  PID_0.Set
 
   // PWM Setup
   // Reacirculation Pumps are connected to Channel !
@@ -130,6 +130,7 @@ void setup() {
   ledcWrite(LEDC_CHANNEL_7, setpoint[7]);
   delay(500);
 
+  temp_filter = ADC1.analogRead(4);
   // Start Timer
   create_args.callback = read_temp; // Set esp-timer argument
   esp_timer_create(&create_args, &timer_handle);
@@ -183,9 +184,10 @@ void loop() {
     }
 
     // Compute PID values for temperature control
-    temp_reactor = sample_values[4];
+    temp_reactor = 0.01 * sample_values[4] + (1 - 0.01) * temp_filter; // 1st order Low pass filter
     PID_0.Compute();
     ledcWrite(LEDC_CHANNEL_3, setpoint[3]);
+    temp_filter = temp_reactor // Update filter
 
     // Turn Feeding pump ON or OFF
     if(oxygen < oxygen_bounds[0]){
