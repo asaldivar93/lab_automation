@@ -1,0 +1,53 @@
+{
+    "data": {
+        "scatter": [{"marker": {"size": 5.5,
+                                "line": {"width": 1, "color": "rgb(0,0,0)"}},
+                     "error_y": {"color": "rgb(0,0,0)",
+                                 "thickness": 2},
+                     "type": "scatter"}],
+        "box": [{"line": {"width": 1},
+        		 "marker": {"size": 6,
+                            "line": {"width": 2}},
+                 "type": "box"}],
+        "bar": [{"marker": {"line": {"width": 2, "color": "rgb(0,0,0)"}},
+                 "type": "box"}],
+        "contour": [{"colorbar": {"thickness": 12,
+        						  "tickwidth": 2,
+        						  "outlinewidth": 2},
+        			 "line": {"width": 1},
+        		     "type": "contour"}]
+    },
+    "layout": {
+        "font": {"family": "Arial",
+                 "size": 14
+                 },
+        "colorway": ["#008E90", "#C5A387", "#E75B64", "#5A6F80", "#4D6D93", "#EAD890", "#AE93BE", "#CEC917",
+                     "#CD4F38", "#1C77A3", "#58A449", "#819A7A", "#5C5992", "#742C14", "#2C715F", "#278B9A",
+                     "#E9D097", "#44A57C", "#F0D77B", "#92BBD9", "#DCCA2C", "#67B8D6", "#DE7862", "#6FB382",
+                     "#D8AF39", "#67B9E9", "#8F8093", "#657060", "#C3AF97", "#E8C4A2", "#B4DAE5", "#B7D9F2",
+                     "#E48C2A", "#3D4F7D"],
+        "height": 283,
+        "width": 300,
+        "margin": {"l": 30, "r": 10, "b": 20, "t": 5},
+        "xaxis": {"title": {"standoff": 10},
+                  "linewidth": 2,
+                  "tickwidth": 2,
+                  "mirror": true
+                  },
+        "yaxis": {"title": {"standoff": 10},
+                  "linewidth": 2,
+                  "tickwidth": 2,
+                  "mirror": true
+                  },
+        "legend": {"font": {"size": 12},
+                   "x": 10,
+                   "y": 0
+                   },
+        "coloraxis": {"colorbar": {"title": {"side": "right"},
+                                "thickness": 12,
+                                "outlinewidth": 2,
+                                "tickwidth": 2
+                                }
+                   }
+    }
+}

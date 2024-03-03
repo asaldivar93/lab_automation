@@ -14,14 +14,8 @@ import numpy as np
 import serial
 
 
-
 class sensors(object):
-    def __init__(
-        self,
-        ADDRESS,
-        port='/dev/ttyUSB0',
-        baud=230400,
-    ):
+    def __init__(self, ADDRESS, port='/dev/ttyUSB0', baud=230400,):
         print('Opening connection')
         self.ADDRESS = ADDRESS
         self.port = port
@@ -36,19 +30,19 @@ class sensors(object):
             self.serial_port = serial.Serial(
                 port=self.port, baudrate=self.baud, timeout=2
             )
-            
+
         self.serial_port.flushInput()
         self.serial_port.flushOutput()
         time.sleep(0.5)
-    
+
     def reconnect(self):
-        
+
         time.sleep(1)
         self.serial_port.close()
         time.sleep(2)
         print("Serial Port Closed")
         self.serial_port = None
-        
+
         while self.serial_port == None:
             time.sleep(5)
             print('Opening connection')
@@ -64,7 +58,7 @@ class sensors(object):
         self.serial_port.flushOutput()
         print("Device Connected")
         time.sleep(0.5)
-    
+
     def get(self):
         cmd_str = self.build_cmd_str('2', '')
         try:
