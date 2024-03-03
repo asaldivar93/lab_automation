@@ -2,11 +2,29 @@
 #include "MCP_ADC.h"
 #include "QuickPID.h"
 
+#define N_OUTPUTS 6
+#define N_INPUTS  8
+
+#define MANUAL 0
+#define TIMER 1
+#define PID 2
+#define ONOFF 3
+
+// Communication pins to MCP3208 ADC
+#define MCP_CLK  5
+#define MCP_DOUT 18
+#define MCP_DIN  19
+#define CS1      23
+
+// PWM PARAMETERS
+#define LEDC_BIT 8
+#define LEDC_BASE_FREQ 800 
+
 typedef struct{
   String type;
   int channel;
   int pin;
-  int mode;
+  int control_mode;
   int value;
 } output;
 
@@ -16,22 +34,6 @@ typedef struct{
   String variable;
   float value;
 } input;
-
-#define N_OUTPUTS 6
-#define N_INPUTS  8
-
-#define MANUAL 0
-#define TIMER 1
-#define PID 2
-#define ONOFF 3
-
-#define PWM 0
-#define DIGITAL 1
-
-//#define ANALOG 0
-//#define I2C 1
-//#define SPI 2
-//#define FLOW 3
 
 output outputs[N_OUTPUTS] =
   {{"pwm", 0, 13, MANUAL, 0}, {"pwm", 1, 12, MANUAL, 0},
@@ -49,25 +51,18 @@ String          ADDRESS = "r101";
 String          inputString = "";
 
 unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
-float           transformed_analogs[8]; // Variable to store analog values after transformation
-float           sample_number;
 
+float           sample_number;
 uint32_t        sample_per_second = 4;
 uint32_t        sample_time = 1000000 / sample_per_second;
 float           sample_time_seconds = 1000000 / (float) sample_per_second / 1000000;
 
 // Measurment Variables
 boolean         READING = false;
-float ref_voltage = 3.3;
-float           total_current; // variable to store total current
-float           dissolved_oxygen;
-float           ph;
+float           ref_voltage = 3.3;
 
 // Setpoints Variables
 float           oxygen_bounds[2] = {0.01, 0.1};
-float           temp_setpoint = 0;
-float           temp_filter;
-float           temp_reactor;
 bool            FEED_ON = false;
 
 // PID values
@@ -75,31 +70,16 @@ float           Kp = 100;
 float           Ki = 0.2;
 float           Kd = 0.;
 
-// Communication pins to MCP3208 ADC
-#define MCP_CLK  5
-#define MCP_DOUT 18
-#define MCP_DIN  19
-#define CS1      23
-
-// PWM CHANNELS
-#define PWM_CHANNEL_0 0
-#define PWM_CHANNEL_1 1
-#define PWM_CHANNEL_2 2
-#define PWM_CHANNEL_3 3
-#define PWM_CHANNEL_4 4
-#define PWM_CHANNEL_5 5
-
-// PWM PARAMETERS
-#define LEDC_BIT 8
-#define LEDC_BASE_FREQ 800
-
-// PWM
-#define PWM_CHANNEL_0_PIN 13
-#define PWM_CHANNEL_1_PIN 12
-#define PWM_CHANNEL_2_PIN 14
-#define PWM_CHANNEL_3_PIN 27
-#define PWM_CHANNEL_4_PIN 26
-#define PWM_CHANNEL_5_PIN 25
+// outputs
+float manual_outputs[6];
+float *pid_input[6], pid_filter[6], pid_output[6], pid_setpoint[6];
+QuickPID PID_0(&pid_filter[0], &pid_output[0], &pid_setpoint[0]);
+QuickPID PID_1(&pid_filter[1], &pid_output[1], &pid_setpoint[1]);
+QuickPID PID_2(&pid_filter[2], &pid_output[2], &pid_setpoint[2]);
+QuickPID PID_3(&pid_filter[3], &pid_output[3], &pid_setpoint[3]);
+QuickPID PID_4(&pid_filter[4], &pid_output[4], &pid_setpoint[4]);
+QuickPID PID_5(&pid_filter[5], &pid_output[5], &pid_setpoint[5]);
+QuickPID all_pids[6] = {PID_0, PID_1, PID_2, PID_3, PID_4, PID_5};
 
 // MCP Object
 MCP3208 ADC1(MCP_DOUT, MCP_DIN, MCP_CLK);
@@ -128,6 +108,14 @@ void setup() {
     }
   }
 
+  for (int i = 0; i<6; i++){
+    all_pids[i].SetMode(all_pids[i].Control::manual);
+    all_pids[i].SetOutputLimits(0, 255);
+    all_pids[i].SetTunings(Kp, Ki, Kd);
+    all_pids[i].SetSampleTimeUs(sample_time);
+    all_pids[i].SetAntiWindupMode(all_pids[i].iAwMode::iAwClamp);
+  }
+
   // Start Timer
   create_args.callback = read_temp; // Set esp-timer argument
   esp_timer_create(&create_args, &timer_handle);
@@ -146,26 +134,26 @@ void loop() {
   }
 
   if (READING) {
-    // During sampling time averge the analog values and apply the necessary
-    // transfomations to calculate temp, etc.
-
-    // Channel 0 has a ACS712 hall effect current sensor
     inputs[0].value = get_current();
-
-    // Channels 1 and 2 have a 220ohm connected to ground
-    // to record ph and dissolved oxygen
     inputs[1].value = get_dissolved_oxygen();
     inputs[2].value = get_ph();
-
-    // Channels 3, 4, 5, 6, 7 have 10Kohm resistors connected to 3.3V
-    // to record temperature from a 10Kohm NTC termistor
     get_temperatures();
 
     for(int i=0; i<N_OUTPUTS; i++){
-      
+      switch (outputs[i].control_mode){
+        case MANUAL:
+          outputs[i].value = manual_outputs[i];
+          break;
+        case PID:
+          all_pids[i].Compute();
+          pid_filter[i] = 0.01 * pid_input[i] + (1 - 0.01) * pid_filter[i];
+          outputs[i].value = pid_output[i];
+          break;
+      }
+      ledcWrite(outputs[i].channel, outputs[i].value);
     }
 
-    // print analog outputs to serial
+
     send_data();
 
     // reset accumulator variable for analog sampling
@@ -184,33 +172,27 @@ void loop() {
 }
 
 float get_current(void){
-  float voltage_acs712;
-
   // Channel 0 has a ACS712 hall effect current sensor
-  voltage_acs712 = (analog[0] / sample_number) * (ref_voltage / 4095);
-  total_current = (voltage_acs712 - 2.5012) / -0.067;
+  float voltage_acs712 = (analog[0] / sample_number) * (ref_voltage / 4095);
+  float current = (voltage_acs712 - 2.5012) / -0.067;
 
-  return total_current;
+  return current;
 }
 
 float get_dissolved_oxygen(void){
-  float voltage_oxygen;
-
   // Channel 1 has a resistor connected to ground
   // to record ph and dissolved oxygen
-  voltage_oxygen = analog[1] / sample_number * (ref_voltage / 4095);
-  dissolved_oxygen = 0.4558 * voltage_oxygen;
+  float voltage_oxygen = analog[1] / sample_number * (ref_voltage / 4095);
+  float dissolved_oxygen = 0.4558 * voltage_oxygen;
 
   return dissolved_oxygen;
 }
 
 float get_ph(void){
-  float voltage_ph;
-
   // Channel 2 has a resistor connected to ground
   // to record ph and dissolved oxygen
-  voltage_ph = analog[2] / sample_number * (ref_voltage / 4095);
-  ph = 3.9811 * voltage_ph - 3.5106;
+  float voltage_ph = analog[2] / sample_number * (ref_voltage / 4095);
+  float ph = 3.9811 * voltage_ph - 3.5106;
 
   return ph;
 }
@@ -244,7 +226,7 @@ void send_data(void){
   Serial.println(all_data_json);
 }
 
-String write_outputs_json(){
+String write_outputs_json(void){
   String outputs_json = "'outputs': [";
 
   for(byte i=0; i < 6; i++){
@@ -259,7 +241,7 @@ String write_outputs_json(){
   return outputs_json;
 }
 
-String write_inputs_json(){
+String write_inputs_json(void){
   String inputs_json = "'inputs': [";
 
   for(byte i=0; i < 8; i++){
@@ -293,36 +275,17 @@ void parseString(String inputString){
       String cmd = inputString.substring(inputString.indexOf(' '), firstcomma);
       int command = cmd.toInt();
 
-      if(command == 1){
+      if(command == 2){
         int lastcomma = firstcomma;
         for (byte i = 0; i < 8; i++){
           int nextcomma = inputString.indexOf(',', lastcomma + 1);
           String val = inputString.substring(lastcomma + 1, nextcomma);
           float value = val.toFloat();
-          manula_output[i] = value;
+          manual_outputs[i] = value;
           lastcomma = nextcomma;
         }
 
       }
-      else if (command == 2){
-        int lastcomma = firstcomma;
-        int nextcomma = inputString.indexOf(',', lastcomma + 1);
-        String val = inputString.substring(lastcomma + 1, nextcomma);
-        float value = val.toFloat();
-        temp_setpoint = value;
-      }
-      else if (command == 3){
-        int lastcomma = firstcomma;
-        for (byte i = 0; i < 2; i++){
-          int nextcomma = inputString.indexOf(',', lastcomma + 1);
-          String val = inputString.substring(lastcomma + 1, nextcomma);
-          float value = val.toFloat();
-          oxygen_bounds[i] = value;
-          lastcomma = nextcomma;
-        }
-      }
-    }
-
     inputString = "";
     new_command = false;
   }

@@ -6,14 +6,10 @@ Created on 2024 Feb 29 12:00
 @author: Alexis Saldivar
 """
 
-import time
-import json
 import ast
 
 from serial.tools import list_ports
 from serial.serialutil import SerialException
-
-import numpy as np
 
 import serial
 
@@ -25,16 +21,13 @@ valid_commands = {
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
 valid_input_types = ["analog", "i2c", "spi", "flow"]
 valid_output_types = ["pwm", "digital"]
-board_info = {"outputs": {"pwm": [(0, 13, "MANUAL"), (1, 12, "MANUAL"),
-                                  (2, 14, "MANUAL"), (3, 27, "MANUAL"),
-                                  (4, 26, "MANUAL"), (5, 25, "MANUAL")]
-                          },
-              "inputs": {"analog": [(0, "current"), (1, "dissolved_oxygen"),
-                                    (2, "ph"), (3, "temperature_0"),
-                                    (4, "temperature_1"), (5, "temperature_2"),
-                                    (6, "temperature_3"), (7, "temperature_4")],
-                         "i2c": [],
-                         }
+board_info = {"outputs": [("pwm", 0, 13, "MANUAL"), ("pwm", 1, 12, "MANUAL"),
+                          ("pwm", 2, 14, "MANUAL"), ("pwm", 3, 27, "MANUAL"),
+                          ("pwm", 4, 26, "MANUAL"), ("pwm", 5, 25, "MANUAL")],
+              "inputs": [("analog", 0, "current"), ("analog", 1, "dissolved_oxygen"),
+                         ("analog", 2, "ph"), ("analog", 3, "temperature_0"),
+                         ("analog", 4, "temperature_1"), ("analog", 5, "temperature_2"),
+                         ("analog", 6, "temperature_3"), ("analog", 7, "temperature_4")],
               }
 
 
@@ -85,12 +78,9 @@ class Board():
 
     def set_outputs(self, board_info):
         self.outputs_list = []
-        for type in board_info["outputs"].keys():
+        for type, channel, pin, control_mode in board_info["outputs"]:
             validate_output_type(type)
-            if board_info["outputs"][type]:
-                self.outputs_list.extend(
-                    [Output(type, channel, pin, control_mode) for channel, pin, control_mode in board_info["outputs"][type]]
-                )
+            self.outputs_list.extend([Output(type, channel, pin, control_mode)])
 
         print(f"{len(self.outputs_list)} output channels detected:")
         for i in self.outputs_list:
@@ -98,12 +88,9 @@ class Board():
 
     def set_inputs(self, board_info):
         self.inputs_list = []
-        for type in board_info["inputs"].keys():
+        for type, channel, variable in board_info["inputs"]:
             validate_input_type(type)
-            if board_info["inputs"][type]:
-                self.inputs_list.extend(
-                    [Input(type, channel, variable) for channel, variable in board_info["inputs"][type]]
-                )
+            self.inputs_list.extend([Input(type, channel, variable)])
 
         print(f"{len(self.inputs_list)} input channels detected:")
         for i in self.inputs_list:
