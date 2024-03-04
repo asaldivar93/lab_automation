@@ -14,7 +14,7 @@ import pandas as pd
 
 EXPERIMENTS_DATABASE_PATH = "experiments_db.tsv"
 inputs_columns_list = [("board", "TEXT"), ("experiment", "TEXT"),
-                       ("type", "TEXT"), ("channel", "INT"), ("variable", "TEXT")]
+                       ("type", "TEXT"), ("channel", "INT"), ("id", "TEXT")]
 datetime_iso = "%Y-%m-%d %H:%M:%-S"
 
 
@@ -101,9 +101,9 @@ class Experiment():
 
     def add_to_inputs_table(self):
         table_name = "inputs"
-        columns = "board, experiment, type, channel, variable"
-        for input in self.board.inputs_list:
-            values = f"'{self.board.ADDDRESS}', '{self.name}', 'input.type', {input.channel}, '{input.variable}'"
+        columns = "board, experiment, type, channel, id"
+        for input in self.board.Inputs:
+            values = f"'{self.board.ADDDRESS}', '{self.name}', 'input.type', {input.channel}, '{input.id}'"
             self.sqlite_db.insert_row(table_name, columns, values)
 
     def create_experiment_table(self):
@@ -114,10 +114,10 @@ class Experiment():
     def build_experiment_columns_list(self):
         columns_list = [("date", "TEXT")]
         columns_list.extend(
-            [("_".join([output.type, str(output.channel)]), "INT") for output in self.board.outputs_list]
+            [(output.id, "INT") for output in self.board.Outputs]
         )
         columns_list.extend(
-            [(input.variable, "REAL") for input in self.board.inputs_list]
+            [(input.id, "REAL") for input in self.board.Inputs]
         )
         return columns_list
 
@@ -131,8 +131,8 @@ class Experiment():
         columns.extend(["_".join([type, str(channel)]) for type, channel, value in data_dict["outputs"]])
         values.extend([str(value) for type, channel, value in data_dict["outputs"]])
 
-        columns.extend([variable for variable, value in data_dict["inputs"]])
-        values.extend([str(value) for variable, value in data_dict["inputs"]])
+        columns.extend([id for id, value in data_dict["inputs"]])
+        values.extend([str(value) for id, value in data_dict["inputs"]])
 
         columns_str = ", ".join(columns)
         values_str = ", ".join(values)

@@ -5,6 +5,12 @@
 #define N_OUTPUTS 6
 #define N_INPUTS  8
 
+// commands
+#define GET_BOARD_INFO 0
+#define TOGGLE_CONTROL_MODE 1
+#define UPDATE_SAMPLES_PER_SECONDS 2
+
+// Output control_modes
 #define MANUAL 0
 #define TIMER 1
 #define PID 2
@@ -18,7 +24,7 @@
 
 // PWM PARAMETERS
 #define LEDC_BIT 8
-#define LEDC_BASE_FREQ 800 
+#define LEDC_BASE_FREQ 800
 
 typedef struct{
   String type;
@@ -26,6 +32,14 @@ typedef struct{
   int pin;
   int control_mode;
   int value;
+  float *input_val;
+  float input_val_lb;
+  float input_val_ub;
+  int time_on;
+  int time_off;
+  int delta_time;
+  int current_timer;
+  bool is_on;
 } output;
 
 typedef struct{
@@ -50,20 +64,11 @@ boolean         new_command = false;
 String          ADDRESS = "r101";
 String          inputString = "";
 
-unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
-
-float           sample_number;
-uint32_t        sample_per_second = 4;
-uint32_t        sample_time = 1000000 / sample_per_second;
-float           sample_time_seconds = 1000000 / (float) sample_per_second / 1000000;
-
 // Measurment Variables
+unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
+float           sample_number;
 boolean         READING = false;
 float           ref_voltage = 3.3;
-
-// Setpoints Variables
-float           oxygen_bounds[2] = {0.01, 0.1};
-bool            FEED_ON = false;
 
 // PID values
 float           Kp = 100;
@@ -72,7 +77,7 @@ float           Kd = 0.;
 
 // outputs
 float manual_outputs[6];
-float *pid_input[6], pid_filter[6], pid_output[6], pid_setpoint[6];
+float pid_filter[6], pid_output[6], pid_setpoint[6];
 QuickPID PID_0(&pid_filter[0], &pid_output[0], &pid_setpoint[0]);
 QuickPID PID_1(&pid_filter[1], &pid_output[1], &pid_setpoint[1]);
 QuickPID PID_2(&pid_filter[2], &pid_output[2], &pid_setpoint[2]);
@@ -108,13 +113,26 @@ void setup() {
     }
   }
 
-  for (int i = 0; i<6; i++){
+  uint32_t sample_per_second = 4;
+  uint32_t sample_time = set_sample_time(sample_per_second);
+  for (int i = 0; i<N_OUTPUTS; i++){
     all_pids[i].SetMode(all_pids[i].Control::manual);
     all_pids[i].SetOutputLimits(0, 255);
     all_pids[i].SetTunings(Kp, Ki, Kd);
     all_pids[i].SetSampleTimeUs(sample_time);
     all_pids[i].SetAntiWindupMode(all_pids[i].iAwMode::iAwClamp);
   }
+
+  get_moving_average();
+  inputs[0].value = get_current();
+  inputs[1].value = get_dissolved_oxygen();
+  inputs[2].value = get_ph();
+  get_temperatures();
+  delay(500);
+  new_command = true;
+  inputString = "r101 1,2,3,4,51.5,!";
+  parseString(inputString);
+  reset_moving_average();
 
   // Start Timer
   create_args.callback = read_temp; // Set esp-timer argument
@@ -125,12 +143,7 @@ void setup() {
 void loop() {
 
   if (!READING){
-    // Between sampling times accumulate the analog values
-    // Moving Average Filter
-    for (byte i = 0; i < ADC1.channels(); i++) {
-      analog[i] += ADC1.analogRead(i);
-    }
-    sample_number += 1;
+    get_moving_average();
   }
 
   if (READING) {
@@ -138,29 +151,9 @@ void loop() {
     inputs[1].value = get_dissolved_oxygen();
     inputs[2].value = get_ph();
     get_temperatures();
-
-    for(int i=0; i<N_OUTPUTS; i++){
-      switch (outputs[i].control_mode){
-        case MANUAL:
-          outputs[i].value = manual_outputs[i];
-          break;
-        case PID:
-          all_pids[i].Compute();
-          pid_filter[i] = 0.01 * pid_input[i] + (1 - 0.01) * pid_filter[i];
-          outputs[i].value = pid_output[i];
-          break;
-      }
-      ledcWrite(outputs[i].channel, outputs[i].value);
-    }
-
-
+    set_output_vals();
     send_data();
-
-    // reset accumulator variable for analog sampling
-    for (byte i = 0; i < ADC1.channels(); i++) {
-      analog[i] = 0;
-    }
-    sample_number = 0;
+    reset_moving_average();
 
     // Restart Timer
     esp_timer_start_once(timer_handle, sample_time);
@@ -171,6 +164,32 @@ void loop() {
   inputString = "";
 }
 
+
+uint32_t set_sample_time(uint32_t sample_per_second){
+  uint32_t sample_time = 1000000 / sample_per_second;
+  for (int i = 0; i<N_OUTPUTS; i++){
+    all_pids[i].SetSampleTimeUs(sample_time);
+  }
+
+  return sample_time
+}
+
+void get_moving_average(void){
+  for (byte i = 0; i < ADC1.channels(); i++) {
+    analog[i] += ADC1.analogRead(i);
+  }
+  sample_number += 1;
+}
+
+
+void reset_moving_average(void){
+  for (byte i = 0; i < ADC1.channels(); i++) {
+    analog[i] = 0;
+  }
+  sample_number = 0;
+}
+
+
 float get_current(void){
   // Channel 0 has a ACS712 hall effect current sensor
   float voltage_acs712 = (analog[0] / sample_number) * (ref_voltage / 4095);
@@ -178,6 +197,7 @@ float get_current(void){
 
   return current;
 }
+
 
 float get_dissolved_oxygen(void){
   // Channel 1 has a resistor connected to ground
@@ -188,6 +208,7 @@ float get_dissolved_oxygen(void){
   return dissolved_oxygen;
 }
 
+
 float get_ph(void){
   // Channel 2 has a resistor connected to ground
   // to record ph and dissolved oxygen
@@ -196,6 +217,7 @@ float get_ph(void){
 
   return ph;
 }
+
 
 void get_temperatures(void){
   float input_voltage = 3.3;
@@ -216,20 +238,70 @@ void get_temperatures(void){
   }
 }
 
+
+void set_output_vals(void){
+  for(int i=0; i<N_OUTPUTS; i++){
+    switch (outputs[i].control_mode){
+      case MANUAL:
+        outputs[i].value = manual_outputs[i];
+        break;
+
+      case TIMER:
+        outputs[i].delta_time = outputs[i].delta_time + 1;
+        if(outputs[i].delta_time > outputs[i].current_timer){
+          if(outputs[i].is_on){
+            outputs[i].is_on = false;
+          }
+          else{
+            outputs[i].is_on = true;
+          }
+          outputs[i].delta_time = 0;
+        }
+        if(outputs[i].is_on){
+          outputs[i].current_timer = outputs[i].time_on;
+          outputs[i].value = manual_outputs[i];
+        }
+        else{
+          outputs[i].current_timer = outputs[i].time_off;
+          outputs[i].value = 0;
+        }
+        break;
+
+      case PID:
+        pid_filter[i] = 0.01 * (*outputs[i].input_val) + (1 - 0.01) * pid_filter[i];
+        all_pids[i].Compute();
+        outputs[i].value = pid_output[i];
+        break;
+
+      case ONOFF:
+        if((*outputs[i].input_val) < outputs[i].input_val_lb){
+          outputs[i].value = manual_outputs[i];
+        }
+        if((*outputs[i].input_val) > outputs[i].input_val_ub){
+          outputs[i].value = 0;
+        }
+        break;
+    }
+    ledcWrite(outputs[i].channel, outputs[i].value);
+  }
+}
+
+
 void send_data(void){
   String outputs_json = write_outputs_json();
   String inputs_json = write_inputs_json();
 
   String all_data_json = "{'address': '" + ADDRESS + "', ";
   all_data_json = all_data_json + outputs_json + ", " + inputs_json;
-  all_data_json = all_data_json + "}115,!";
+  all_data_json = all_data_json + "}100,!";
   Serial.println(all_data_json);
 }
+
 
 String write_outputs_json(void){
   String outputs_json = "'outputs': [";
 
-  for(byte i=0; i < 6; i++){
+  for(byte i=0; i < N_OUTPUTS; i++){
     outputs_json = outputs_json + "(";
     outputs_json = outputs_json + "'" + outputs[i].type + "',";
     outputs_json = outputs_json + outputs[i].channel + ",";
@@ -241,10 +313,11 @@ String write_outputs_json(void){
   return outputs_json;
 }
 
+
 String write_inputs_json(void){
   String inputs_json = "'inputs': [";
 
-  for(byte i=0; i < 8; i++){
+  for(byte i=0; i < N_INPUTS; i++){
     inputs_json = inputs_json + "(";
     inputs_json = inputs_json + "'" + inputs[i].variable + "',";
     inputs_json = inputs_json + inputs[i].value;
@@ -254,6 +327,38 @@ String write_inputs_json(void){
 
   return inputs_json;
 }
+
+
+void send_board_info(void){
+  String outputs_json = "'outputs': [";
+
+  for(byte i=0; i < N_OUTPUTS; i++){
+    outputs_json = outputs_json + "(";
+    outputs_json = outputs_json + "'" + outputs[i].type + "',";
+    outputs_json = outputs_json + outputs[i].channel + ",";
+    outputs_json = outputs_json + outputs[i].pin + ",";
+    outputs_json = outputs_json + outputs[i].control_mode;
+    outputs_json = outputs_json + "),";
+  }
+  outputs_json = outputs_json + "]";
+
+  String inputs_json = "'inputs': [";
+
+  for(byte i=0; i < N_INPUTS; i++){
+    inputs_json = inputs_json + "(";
+    inputs_json = inputs_json + "'" + inputs[i].type + "',";
+    inputs_json = inputs_json + inputs[i].channel + ",";
+    inputs_json = inputs_json + "'" + inputs[i].variable + "'";
+    inputs_json = inputs_json + "),";
+  }
+  inputs_json = inputs_json + "]";
+
+  String all_data_json = "{'address': '" + ADDRESS + "', ";
+  all_data_json = all_data_json + outputs_json + ", " + inputs_json;
+  all_data_json = all_data_json + "}115,!";
+  Serial.println(all_data_json);
+}
+
 
 void parseSerial(void){
   while(Serial.available()){
@@ -267,26 +372,125 @@ void parseSerial(void){
 }
 
 void parseString(String inputString){
+  int firstcomma;
+  int lastcomma;
+  int nextcomma;
+  int command;
+  String ok_string = "{}115!";
+
   if(new_command){
     String ADDR = inputString.substring(0, inputString.indexOf(' '));
 
     if(ADDR == ADDRESS){
-      int firstcomma = inputString.indexOf(',');
-      String cmd = inputString.substring(inputString.indexOf(' '), firstcomma);
-      int command = cmd.toInt();
+      firstcomma = inputString.indexOf(',');
+      command = inputString.substring(inputString.indexOf(' '), firstcomma).toInt();
 
-      if(command == 2){
-        int lastcomma = firstcomma;
-        for (byte i = 0; i < 8; i++){
-          int nextcomma = inputString.indexOf(',', lastcomma + 1);
-          String val = inputString.substring(lastcomma + 1, nextcomma);
-          float value = val.toFloat();
-          manual_outputs[i] = value;
-          lastcomma = nextcomma;
+      if(command == GET_BOARD_INFO){
+//      GET_BOARD_INFO: "r101 0,!"
+        send_board_info();
+      }
+
+      if(command == UPDATE_SAMPLES_PER_SECONDS){
+//      GET_BOARD_INFO: "r101 2,SAMPLES_PER_SECOND,!"
+        lastcomma = firstcomma;
+        nextcomma = inputString.indexOf(',', lastcomma + 1);
+        uint32_t samples_per_second = inputString.substring(lastcomma + 1, nextcomma).toInt();
+        sample_time = set_sample_time(samples_per_second)
+      }
+
+      if(command == TOGGLE_CONTROL_MODE){
+//      MANUAL: "r101, 1,0,OUT_CHANNEL,PWM,!"
+//      TIMER:  "r101, 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
+//      PID:    "r101, 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
+//      ONOFF:  "r101, 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
+
+        lastcomma = firstcomma;
+        nextcomma = inputString.indexOf(',', lastcomma + 1);
+        int control_mode = inputString.substring(lastcomma + 1, nextcomma).toInt();
+        lastcomma = nextcomma;
+        nextcomma = inputString.indexOf(',', lastcomma + 1);
+        int out_channel = inputString.substring(lastcomma + 1, nextcomma).toInt();
+
+        outputs[out_channel].control_mode = control_mode;
+
+        switch(outputs[out_channel].control_mode){
+          case MANUAL:{
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int value = inputString.substring(lastcomma + 1, nextcomma).toInt();
+
+            manual_outputs[out_channel] = value;
+            all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
+            Serial.println(ok_string);
+            break;
+          }
+
+          case TIMER:{
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int time_on = inputString.substring(lastcomma + 1, nextcomma).toInt();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int time_off = inputString.substring(lastcomma + 1, nextcomma).toInt();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int value = inputString.substring(lastcomma + 1, nextcomma).toInt();
+
+            manual_outputs[out_channel] = value;
+            all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
+            outputs[out_channel].time_on = time_on;
+            outputs[out_channel].time_off = time_off;
+            outputs[out_channel].delta_time = 0;
+            outputs[out_channel].current_timer = outputs[out_channel].time_on;
+            outputs[out_channel].is_on = true;
+            Serial.println(ok_string);
+            break;
+          }
+
+          case PID:{
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int in_channel = inputString.substring(lastcomma + 1, nextcomma).toInt();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            float setpoint = inputString.substring(lastcomma + 1, nextcomma).toFloat();
+
+            all_pids[out_channel].SetMode(all_pids[out_channel].Control::automatic);
+            pid_setpoint[out_channel] = setpoint;
+
+            outputs[out_channel].input_val = &inputs[in_channel].value;
+            pid_filter[out_channel] = inputs[in_channel].value;
+            Serial.println(ok_string);
+            break;
+          }
+
+          case ONOFF:{
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int in_channel = inputString.substring(lastcomma + 1, nextcomma).toInt();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            float lower_bound = inputString.substring(lastcomma + 1, nextcomma).toFloat();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            float upper_bound = inputString.substring(lastcomma + 1, nextcomma).toFloat();
+            lastcomma = nextcomma;
+            nextcomma = inputString.indexOf(',', lastcomma + 1);
+            int value = inputString.substring(lastcomma + 1, nextcomma).toInt();
+
+            manual_outputs[out_channel] = value;
+            outputs[out_channel].input_val_lb = lower_bound;
+            outputs[out_channel].input_val_ub = upper_bound;
+            all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
+
+            outputs[out_channel].input_val = &inputs[in_channel].value;
+            Serial.println(ok_string);
+            break;
+          }
         }
-
       }
     inputString = "";
     new_command = false;
+    }
   }
 }
