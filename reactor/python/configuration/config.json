@@ -1,5 +1,5 @@
 {
-  "pwm_0": {"mode": "MANUAL", "value": 0,
+  "pwm_0": {"mode": "MANUAL", "value": 100,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null

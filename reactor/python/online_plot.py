@@ -5,7 +5,7 @@ Created on Wed Apr  1 18:27:31 2020
 
 @author: alexis
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from matplotlib.animation import FuncAnimation
 
@@ -16,26 +16,33 @@ import Handle
 
 
 class Plotter:
-    def __init__(self, experiment_name: str, DATABASE_PATH: str = "database.db"):
+    def __init__(self, experiment_name: str, DATABASE_PATH: str = "database.db", time_units: str = "hours"):
         self.experiment = experiment_name
+        self.time_units = time_units
         self.sqlite_db = self.connect_to_db(DATABASE_PATH)
         self.data_df = pd.DataFrame()
+        self.start_time = self.get_startime()
 
     def connect_to_db(self, DATABASE_PATH):
         return Handle.Database(DATABASE_PATH="database.db")
 
+    def get_startime(self):
+        query_str = f"SELECT * FROM {self.experiment} WHERE ROWID = 1"
+        data_df = pd.DataFrame(
+            self.sqlite_db.cursor.execute(query_str)
+        )
+        data_df.loc[:, "date"] = data_df.loc[:, "date"].apply(
+            lambda date_str: datetime.fromisoformat(date_str)
+        )
+        return data_df.loc[0, "date"]
+
     def get_data(self, time_span: float = 24):
-        time_span_str = self.get_time_span(time_span)
-        query_str = f"SELECT * FROM {self.experiment} WHERE '{time_span_str}'<date AND ROWID % 4 = 0"
+        query_str = f"SELECT * FROM {self.experiment} WHERE date >= datetime('now', 'localtime', '-24 {self.time_units}') AND ROWID % 4 = 0"
         data_df = pd.DataFrame(
             self.sqlite_db.cursor.execute(query_str)
         )
 
         return data_df
-
-    def get_time_span(self, time_span: float = 24) -> str:
-        from_datetime = datetime.now() - timedelta(hours=time_span)
-        return from_datetime.isoformat(sep=" ", timespec="milliseconds")
 
     def create_figure(self):
         figure = plot.figure(constrained_layout=True)
@@ -114,7 +121,7 @@ class Plotter:
         self.data_df.loc[:, "date"] = self.data_df.loc[:, "date"].apply(
             lambda date_str: datetime.fromisoformat(date_str)
         )
-        start_time = self.data_df.loc[0, "date"]
+        start_time = self.start_time
         time = self.data_df.loc[:, "date"].apply(
             self.get_time, args=(start_time, self.time_units,)
         )
@@ -136,7 +143,7 @@ class Plotter:
 
     def get_time(self, date, start_date, units):
         time_delta = date - start_date
-        time_delta_seconds = time_delta.days * 24 * 3600 + time_delta.seconds
+        time_delta_seconds = time_delta.days * 24 * 3600 + time_delta.seconds + time_delta.microseconds / 1e6
 
         if units == "seconds":
             return time_delta_seconds
@@ -147,14 +154,9 @@ class Plotter:
         if units == "days":
             return time_delta_seconds / 3600 / 24
 
-    def set_time_units(self, time_units):
-        self.time_units = time_units
-
 
 if __name__ == "__main__":
-    plotter = Plotter(experiment_name="test")
-
-    plotter.set_time_units("seconds")
+    plotter = Plotter(experiment_name="test", time_units="minutes")
 
     plotter.set_ax_00_vars(["temperature_0", "temperature_1"])
     plotter.set_ax_01_vars(["pwm_0"])
@@ -166,8 +168,3 @@ if __name__ == "__main__":
 
     ani = FuncAnimation(figure, plotter.update, init_func=plotter.init, interval=1000 * 1)
     plot.show()
-
-# plotter.get_data()
-# a = datetime.fromisoformat("2024-03-04 19:57:12.244")
-#
-# a.time()
