@@ -1,88 +1,173 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Wed Apr  1 18:27:31 2020
 
 @author: alexis
 """
+from datetime import datetime, timedelta
+
 from matplotlib.animation import FuncAnimation
 
 import matplotlib.pyplot as plot
 import pandas as pd
 
-
-a = sqlite_db.cursor.execute("SELECT * FROM test").fetchall()
-pd.DataFrame(a)
+import Handle
 
 
-# Initialize figure
-experiment = '20231218_calibracion_pid_temp2'
-figure = plot.figure(constrained_layout=True)
-grid = figure.add_gridspec(4, 4)
+class Plotter:
+    def __init__(self, experiment_name: str, DATABASE_PATH: str = "database.db"):
+        self.experiment = experiment_name
+        self.sqlite_db = self.connect_to_db(DATABASE_PATH)
+        self.data_df = pd.DataFrame()
 
-# Temperature of the heater
-ax_temperatures = figure.add_subplot(grid[:2, :2])
-ln_T_heater, = ax_temperatures.plot([], [], "g.")
-ln_T_liquid, = ax_temperatures.plot([], [], "b.")
-ln_T_sensor, = ax_temperatures.plot([], [], "r.")
-ln_T_amb, = ax_temperatures.plot([], [], "c.")
-ax_temperatures.set_ylabel("Temperature")
+    def connect_to_db(self, DATABASE_PATH):
+        return Handle.Database(DATABASE_PATH="database.db")
 
-# UA
-ax_biomass = figure.add_subplot(grid[:2, 2:])
-ln_biomass, = ax_biomass.plot([], [],".")
-ax_biomass.set_ylabel("Biomass")
+    def get_data(self, time_span: float = 24):
+        time_span_str = self.get_time_span(time_span)
+        query_str = f"SELECT * FROM {self.experiment} WHERE '{time_span_str}'<date AND ROWID % 4 = 0"
+        data_df = pd.DataFrame(
+            self.sqlite_db.cursor.execute(query_str)
+        )
 
-# UA_loss
-ax_oxygen = figure.add_subplot(grid[2:, :2])
-ln_oxygen, = ax_oxygen.plot([], [], ".")
-ax_oxygen.set_ylabel("Dissolved Oxygen")
+        return data_df
 
-# UA_loss1
-ax_ph = figure.add_subplot(grid[2:, 2:])
-ln_ph, = ax_ph.plot([], [], ".")
-ax_ph.set_ylabel("pH")
+    def get_time_span(self, time_span: float = 24) -> str:
+        from_datetime = datetime.now() - timedelta(hours=time_span)
+        return from_datetime.isoformat(sep=" ", timespec="milliseconds")
+
+    def create_figure(self):
+        figure = plot.figure(constrained_layout=True)
+        grid = figure.add_gridspec(4, 4)
+        return figure, grid
+
+    def create_axes(self, figure, grid):
+        self.ax_00 = figure.add_subplot(grid[:2, :2])
+        ln_00_0, = self.ax_00.plot([], [], " g.")
+        ln_00_1, = self.ax_00.plot([], [], "b.")
+        ln_00_2, = self.ax_00.plot([], [], "r.")
+        ln_00_3, = self.ax_00.plot([], [], "c.")
+        self.ax_00_ln = [ln_00_0, ln_00_1, ln_00_2, ln_00_3]
+
+        self.ax_01 = figure.add_subplot(grid[:2, 2:])
+        ln_01_0, = self.ax_01.plot([], [], " g.")
+        ln_01_1, = self.ax_01.plot([], [], "b.")
+        ln_01_2, = self.ax_01.plot([], [], "r.")
+        ln_01_3, = self.ax_01.plot([], [], "c.")
+        self.ax_01_ln = [ln_01_0, ln_01_1, ln_01_2, ln_01_3]
+
+        self.ax_10 = figure.add_subplot(grid[2:, :2])
+        ln_10_0, = self.ax_10.plot([], [], " g.")
+        ln_10_1, = self.ax_10.plot([], [], "b.")
+        ln_10_2, = self.ax_10.plot([], [], "r.")
+        ln_10_3, = self.ax_10.plot([], [], "c.")
+        self.ax_10_ln = [ln_10_0, ln_10_1, ln_10_2, ln_10_3]
+
+        self.ax_11 = figure.add_subplot(grid[2:, 2:])
+        ln_11_0, = self.ax_11.plot([], [], " g.")
+        ln_11_1, = self.ax_11.plot([], [], "b.")
+        ln_11_2, = self.ax_11.plot([], [], "r.")
+        ln_11_3, = self.ax_11.plot([], [], "c.")
+        self.ax_11_ln = [ln_11_0, ln_11_1, ln_11_2, ln_11_3]
+
+    def set_ax_00_data(self, time, variables: list):
+        for i in range(0, len(variables)):
+            data_y = self.data_df.loc[:, variables[i]]
+            self.ax_00_ln[i].set_data(time, data_y)
+
+    def set_ax_01_data(self, time, variables: list):
+        for i in range(0, len(variables)):
+            data_y = self.data_df.loc[:, variables[i]]
+            self.ax_01_ln[i].set_data(time, data_y)
+
+    def set_ax_10_data(self, time, variables: list):
+        for i in range(0, len(variables)):
+            data_y = self.data_df.loc[:, variables[i]]
+            self.ax_10_ln[i].set_data(time, data_y)
+
+    def set_ax_11_data(self, time, variables: list):
+        for i in range(0, len(variables)):
+            data_y = self.data_df.loc[:, variables[i]]
+            self.ax_10_ln[i].set_data(time, data_y)
+
+    def set_ax_00_vars(self, variables: list):
+        self.ax_00_vars = variables
+
+    def set_ax_01_vars(self, variables: list):
+        self.ax_01_vars = variables
+
+    def set_ax_10_vars(self, variables: list):
+        self.ax_10_vars = variables
+
+    def set_ax_11_vars(self, variables: list):
+        self.ax_11_vars = variables
+
+    def init(self):
+        self.ax_00.autoscale_view(scaley=True)
+        self.ax_01.autoscale_view(scaley=True)
+        self.ax_10.autoscale_view(scaley=True)
+        self.ax_11.autoscale_view(scaley=True)
+
+    def update(self, i):
+        self.data_df = self.get_data(time_span=24)
+        self.data_df.loc[:, "date"] = self.data_df.loc[:, "date"].apply(
+            lambda date_str: datetime.fromisoformat(date_str)
+        )
+        start_time = self.data_df.loc[0, "date"]
+        time = self.data_df.loc[:, "date"].apply(
+            self.get_time, args=(start_time, self.time_units,)
+        )
+
+        self.set_ax_00_data(time, self.ax_00_vars)
+        self.set_ax_01_data(time, self.ax_01_vars)
+        self.set_ax_10_data(time, self.ax_10_vars)
+        self.set_ax_11_data(time, self.ax_11_vars)
+
+        self.ax_00.autoscale_view(scaley=True)
+        self.ax_01.autoscale_view(scaley=True)
+        self.ax_10.autoscale_view(scaley=True)
+        self.ax_11.autoscale_view(scaley=True)
+
+        self.ax_00.relim()
+        self.ax_01.relim()
+        self.ax_10.relim()
+        self.ax_11.relim()
+
+    def get_time(self, date, start_date, units):
+        time_delta = date - start_date
+        time_delta_seconds = time_delta.days * 24 * 3600 + time_delta.seconds
+
+        if units == "seconds":
+            return time_delta_seconds
+        if units == "minutes":
+            return time_delta_seconds / 60
+        if units == "hours":
+            return time_delta_seconds / 3600
+        if units == "days":
+            return time_delta_seconds / 3600 / 24
+
+    def set_time_units(self, time_units):
+        self.time_units = time_units
 
 
-def init():
-    ax_temperatures.set_ylim(20, 70)
+if __name__ == "__main__":
+    plotter = Plotter(experiment_name="test")
 
+    plotter.set_time_units("seconds")
 
-# Data plot
-def update(i):
+    plotter.set_ax_00_vars(["temperature_0", "temperature_1"])
+    plotter.set_ax_01_vars(["pwm_0"])
+    plotter.set_ax_10_vars(["dissolved_oxygen"])
+    plotter.set_ax_11_vars(["ph"])
 
-    data = pd.read_csv(experiment + '/data.csv')
-    data = data.loc[::6].tail(2880)
+    figure, grid = plotter.create_figure()
+    plotter.create_axes(figure, grid)
 
-    time = data.loc[:, "Time"] / 3600
-    T_heater = data.loc[:, "T_heater"]
-    T_liquid = data.loc[:, "T_liquid"]
-    T_sensor = data.loc[:, "T_sensor"]
-    T_amb = data.loc[:, "T_amb"]
-    biomass = data.loc[:, "PWM_heater"]
-    oxygen = data.loc[:, "Dissolved_oxygen"]
-    ph = data.loc[:, "pH"]
+    ani = FuncAnimation(figure, plotter.update, init_func=plotter.init, interval=1000 * 1)
+    plot.show()
 
-    ln_T_heater.set_data(time, T_heater)
-    ln_T_liquid.set_data(time, T_liquid)
-    ln_T_sensor.set_data(time, T_sensor)
-    ln_T_amb.set_data(time, T_amb)
-    ln_biomass.set_data(time, biomass)
-    ln_oxygen.set_data(time, oxygen)
-    ln_ph.set_data(time, ph)
-
-    ax_temperatures.relim()
-    ax_temperatures.autoscale_view(scaley=False)
-
-    ax_biomass.relim()
-    ax_biomass.autoscale_view(scaley=True)
-
-    ax_oxygen.relim()
-    ax_oxygen.autoscale_view(scaley=True)
-
-    ax_ph.relim()
-    ax_ph.autoscale_view(scaley=True)
-
-
-ani = FuncAnimation(figure, update, init_func=init, interval=1000 * 1)
-plot.show()
+# plotter.get_data()
+# a = datetime.fromisoformat("2024-03-04 19:57:12.244")
+#
+# a.time()

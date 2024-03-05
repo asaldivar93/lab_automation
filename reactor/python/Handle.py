@@ -86,7 +86,7 @@ class Experiment():
 
     def add_to_experiments_db(self):
         record = pd.DataFrame(
-            [[self.name, self.start_time.strftime(datetime_iso)]],
+            [[self.name, self.start_time.isoformat(sep=" ", timespec="milliseconds")]],
             columns=["experiment", "start_time"]
         )
         if os.path.isfile(EXPERIMENTS_DATABASE_PATH):

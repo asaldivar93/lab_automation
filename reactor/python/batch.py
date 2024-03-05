@@ -1,136 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Created on 2024 Feb 29 12:00
+
+@author: Alexis Saldivar
+"""
 from datetime import datetime
 
-import pandas as pd
-import arduino
-import os
+import Board
+import Handle
 
-# Initialize Variables
-print('Initializing')
+sqlite_db = Handle.Database(DATABASE_PATH="database.db")
+board = Board.Board(address="r101", baud_rate=230400,
+                    port_name="/dev/ttyUSB0")
 
-# Create directory
-recorder = arduino.sensors(
-    ADDRESS="r101", baud=230400
-)
-experiment_name = "20231218_calibracion_pid_temp2"
-dir_string = experiment_name
-os.mkdir(dir_string)
-results_file = dir_string + '/data.csv'
+experiment = Handle.Experiment(name="test", sqlite_db=sqlite_db,
+                               board=board)
 
-# Create file to dump data
-with open(results_file, 'w+') as file:
-    pd.DataFrame(
-        columns=['Date', 'Time', 'Biomass', 'Dissolved_oxygen', 'pH',
-                 'T_heater', 'T_liquid', 'T_sensor', 'T_amb',
-                 'Power', 'PWM_feed', 'PWM_heater'],
-    ).to_csv(file, index=False)
-
-pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-last_pwm = [pwm for pwm in pwm_values['pwm']]
-recorder.update_pumps(last_pwm)
-
-temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
-last_setpoint = temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
-recorder.update_temp_setpoint(last_setpoint)
-
-oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
-last_bounds = [bound for bound in oxygen_bounds['bounds']]
-recorder.update_oxygen_bounds(last_bounds)
-
-# If samples are sent from arduino every 0.250 seconds
-# the samples per second are 4 * sample_frecuency
-sample_frecuency = 20
-samples = 19
-
-# PWM timers
-pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-pwm_timers = pwm_values.query('timer>0')
-pwm_last_time = pd.Series(dtype=float)
-pwm_delta_time = pd.Series(dtype=float)
-timer = pd.Series(dtype=str)
-PWM_ON = pd.Series(dtype=bool)
-for channel in pwm_values.index:
-    PWM_ON.loc[channel] = True
-    timer.loc[channel] = pwm_values.loc[channel, "time_on"]
-    pwm_last_time.loc[channel] = datetime.now()
-    pwm_delta_time.loc[channel] = 0
-
-# Infinite loop
-print('Experiment Started')
-start_time = datetime.now()
-last_time = start_time
-while(True):
-    # Every time there is a serial input
+experiment.board.start_config_observer()
+while True:
     try:
-        if (recorder.serial_port.inWaiting() > 0):
-            # Get rpm from serial string
-            data = recorder.read()
-            samples += 1
-            # Record Time
-            date = datetime.now()  # Date
-            time_delta = date - start_time  # Time since experiment started
-            time = (time_delta.days * 24 * 3600) + time_delta.seconds + time_delta.microseconds / 1e6  # Time in seconds
-
-            # Set the PWM output
-            pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-            pwm_timers = pwm_values.query('timer>0')
-            pwm_values = [pwm for pwm in pwm_values['pwm']]
-            for channel in pwm_timers.index:
-                delta = date - pwm_last_time[channel]
-                pwm_delta_time[channel] = delta.seconds + delta.microseconds / 1e6
-
-                if pwm_delta_time[channel] > timer[channel]:
-                    PWM_ON[channel] = not PWM_ON[channel]
-                    pwm_last_time[channel] = datetime.now()
-                    print(channel, list(PWM_ON))
-
-                if PWM_ON[channel]:
-                    timer[channel] = pwm_timers.loc[channel, "time_on"]
-                else:
-                    pwm_values[channel] = 0
-                    timer[channel] = pwm_timers.loc[channel, "time_off"]
-            recorder.update_pumps(pwm_values)
-
-            # Set the temperature setpoint
-            temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
-            temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
-            recorder.update_temp_setpoint(temp_setpoint)
-
-            # Set the oxygen_bounds setpoint
-            oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
-            oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
-            recorder.update_oxygen_bounds(oxygen_bounds)
-
-            # Dump Data to file
-            if samples >= sample_frecuency:
-                with open(results_file, 'a+') as file:
-                    pd.DataFrame(
-                        [[date.strftime("%d-%m-%Y_%H-%M-%S"), time,
-                         data[0], data[1], data[2],
-                         data[3], data[4], data[5],
-                         data[6], data[7], data[8], data[9]]],
-                        columns=['Date', 'Time', 'Biomass', 'Dissolved_oxygen', 'pH',
-                                 'T_heater', 'T_liquid', 'T_sensor', 'T_amb',
-                                 'Power', 'PWM_feed', 'PWM_heater'],
-                    ).to_csv(file, index=False, header=False)
-                samples = 0
-    except OSError as e:
-        print(e)
-        recorder.reconnect()
-
-        # Reset Set points
-        pwm_values = pd.read_csv('pwm_value.csv', index_col="Channel")
-        pwm_values = [pwm for pwm in pwm_values['pwm']]
-        recorder.update_pumps(pwm_values)
-        last_pwm_values = pwm_values
-
-        temp_setpoint = pd.read_csv('temp_setpoint.csv', index_col="Channel")
-        temp_setpoint = [temp for temp in temp_setpoint['setpoints']]
-        recorder.update_temp_setpoint(temp_setpoint)
-        last_setpoint = temp_setpoint
-
-        oxygen_bounds = pd.read_csv('oxygen_bounds.csv', index_col="Channel")
-        oxygen_bounds = [bound for bound in oxygen_bounds['bounds']]
-        recorder.update_oxygen_bounds(oxygen_bounds)
-        last_bounds = oxygen_bounds
+        if (experiment.board.serial_port.inWaiting() > 0):
+            time = datetime.now()
+            data_dict = experiment.board.read_data()
+            if data_dict:
+                experiment.save_data(
+                    time=time, data_dict=data_dict
+                )
+            experiment.board.update_configuration()
+    except KeyboardInterrupt:
+        board.config_observer.stop()
+        board.serial_port.close()
