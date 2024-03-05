@@ -103,7 +103,7 @@ class Experiment():
         table_name = "inputs"
         columns = "board, experiment, type, channel, id"
         for input in self.board.Inputs:
-            values = f"'{self.board.ADDDRESS}', '{self.name}', 'input.type', {input.channel}, '{input.id}'"
+            values = f"'{self.board.address}', '{self.name}', 'input.type', {input.channel}, '{input.id}'"
             self.sqlite_db.insert_row(table_name, columns, values)
 
     def create_experiment_table(self):

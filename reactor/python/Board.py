@@ -5,29 +5,28 @@ Created on 2024 Feb 29 12:00
 
 @author: Alexis Saldivar
 """
+from typing import Callable
 
 import ast
+import json
+import logging
+import os
 
 from serial.tools import list_ports
 from serial.serialutil import SerialException
+
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 import serial
 
 valid_baud_rates = [230400]
 valid_commands = {
-    "GET_BOARD_INFO": 0, "TOGGLE_CONTROL_MODE": 1,
+    "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1,
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
-valid_input_types = ["analog", "i2c", "spi", "flow"]
-valid_output_types = ["pwm", "digital"]
-board_info = {"outputs": [("pwm", 0, 13, "MANUAL"), ("pwm", 1, 12, "MANUAL"),
-                          ("pwm", 2, 14, "MANUAL"), ("pwm", 3, 27, "MANUAL"),
-                          ("pwm", 4, 26, "MANUAL"), ("pwm", 5, 25, "MANUAL")],
-              "inputs": [("analog", 0, "current"), ("analog", 1, "dissolved_oxygen"),
-                         ("analog", 2, "ph"), ("analog", 3, "temperature_0"),
-                         ("analog", 4, "temperature_1"), ("analog", 5, "temperature_2"),
-                         ("analog", 6, "temperature_3"), ("analog", 7, "temperature_4")],
-              }
+valid_input_types = ["analog", "i2c", "spi", "pulses", "flow"]
+valid_output_types = ["pwm", "digital", "speed"]
 
 
 class Dictlist(list):
@@ -40,6 +39,14 @@ class Dictlist(list):
 
     def get_by_id(self, id: str):
         return list.__getitem__(self, self._dict[id])
+
+
+class config_handler(FileSystemEventHandler):
+    def __init__(self, fun_callback: Callable):
+        self.fun_callback = fun_callback
+
+    def on_modified(self, event):
+        self.fun_callback()
 
 
 class Output():
@@ -70,13 +77,18 @@ class Input():
 class Board():
     def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400):
         self.address = address
+
         self.set_serial_port(port_name)
         self.set_baud_rate(baud_rate)
         self.open_connection()
+
         print("Connection successfull\n")
         board_info_dict = self.request_board_info()
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
+
+        self.config_dir = "configuration/"
+        self.read_config_json()
 
     def set_serial_port(self, port_name):
         validate_serial_port(port_name)
@@ -116,6 +128,14 @@ class Board():
         for i in self.Inputs:
             print(i)
 
+    def read_config_json(self):
+        with open(os.path.join(self.config_dir, "config.json"), "r") as file:
+            try:
+                self.config_dict = json.load(file)
+                self.is_config_updated = True
+            except ValueError as error:
+                logging.warning(f" JSONDecodeError: {error}")
+
     def read_data(self):
         data_str = self.readline()
         if self.is_valid_data_string(data_str):
@@ -138,12 +158,24 @@ class Board():
     def convert_input_string_to_json(self, input_string: str) -> str:
         return input_string.replace("115,!", "").replace("'", '"').replace(", }", "}").replace("100,!", "")
 
+    def update_configuration(self):
+        if self.is_config_updated:
+            command = "UPDATE_CONFIGURATION"
+            args_queue = self.parse_config(self.config_dict)
+            while args_queue:
+                self.write(command, args_queue[0])
+                args_queue.pop(0)
+            self.is_config_updated = False
+            print("Board configuration updated")
+            logging.info("Board configuration updated")
+
     def write(self, command: str, args: list = None):
         confirmation = False
         cmd_str = self.build_cmd_str(command, args)
         while not confirmation:
             self.serial_port.write(cmd_str.encode())
             self.serial_port.flush()
+            # self.serial_port.flushOutput()
             if self.serial_port.inWaiting() > 0:
                 input = self.readline()
                 if self.is_valid_input_string(input):
@@ -167,13 +199,98 @@ class Board():
         try:
             cmd = valid_commands[command]
         except KeyError:
-            print(f"{command} not a valid command, must be one of {valid_commands}")
+            logging.warning(f"{command} not a valid command, must be one of {valid_commands}")
 
         if args:
             args = ','.join(map(str, args))
         else:
             args = ''
-        return self.address + " {cmd},{args}!\n".format(cmd=cmd, args=args)
+        return self.address + " {cmd},{args},!\n".format(cmd=cmd, args=args)
+
+    def start_config_observer(self):
+        self.config_observer = Observer()
+        event_handler = config_handler(self.read_config_json)
+        self.config_observer.schedule(event_handler, path="configuration/", recursive=True)
+        self.config_observer.start()
+
+    def parse_config(self, config_dict):
+        args_queue = []
+        for channel_id in config_dict.keys():
+            try:
+                out_channel = self.Outputs.get_by_id(channel_id).channel
+            except KeyError:
+                logging.warning(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
+            else:
+                match config_dict[channel_id]:
+                    case {"mode": "MANUAL", "value": value}:
+                        control_mode = valid_control_modes["MANUAL"]
+                        if isinstance(value, int):
+                            args_queue.append([control_mode, out_channel, value])
+                        else:
+                            logging.warning(f"In {channel_id}, value must be of type(int)")
+
+                    case {"mode": "TIMER", "value": value, "time_on": time_on, "time_off": time_off}:
+                        control_mode = valid_control_modes["TIMER"]
+                        if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
+                            args_queue.append([control_mode, out_channel, time_on, time_off, value])
+                        else:
+                            logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
+
+                    case {"mode": "PID", "setpoint": setpoint, "variable": variable}:
+                        control_mode = valid_control_modes["PID"]
+                        try:
+                            in_channel = self.Inputs.get_by_id(variable).channel
+                        except KeyError:
+                            logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
+                        else:
+                            if isinstance(setpoint, (float, int)):
+                                args_queue.append([control_mode, out_channel, in_channel, setpoint])
+                            else:
+                                logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
+
+                    case {"mode": "ONOFF", "value": value, "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound}:
+                        control_mode = valid_control_modes["ONOFF"]
+                        try:
+                            in_channel = self.Inputs.get_by_id(variable).channel
+                        except KeyError:
+                            logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
+                        else:
+                            if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
+                                args_queue.append([control_mode, out_channel, in_channel, lower_bound, upper_bound, value])
+                            else:
+                                logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
+
+                    case {"mode": mode}:
+                        logging.warning(f"{mode} mode must be on of {valid_control_modes}")
+
+                    case _:
+                        logging.warning(f"{config_dict[channel_id]}")
+
+        return args_queue
+
+    def reconnect(self):
+
+        time.sleep(1)
+        self.serial_port.close()
+        time.sleep(2)
+        print("Serial Port Closed")
+        self.serial_port = None
+
+        while self.serial_port is None:
+            time.sleep(5)
+            print('Opening connection')
+            try:
+                ports = list_ports.comports()
+                self.port = ports[0].device
+                self.serial_port = serial.Serial(
+                    port=self.port, baudrate=self.baud, timeout=2
+                )
+            except IndexError:
+                print("Line connection Lost")
+        self.serial_port.flushInput()
+        self.serial_port.flushOutput()
+        print("Device Connected")
+        time.sleep(0.5)
 
 
 def validate_serial_port(port_name):

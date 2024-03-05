@@ -69,6 +69,8 @@ unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator v
 float           sample_number;
 boolean         READING = false;
 float           ref_voltage = 3.3;
+uint32_t sample_per_second = 4;
+uint32_t sample_time;
 
 // PID values
 float           Kp = 100;
@@ -113,8 +115,8 @@ void setup() {
     }
   }
 
-  uint32_t sample_per_second = 4;
-  uint32_t sample_time = set_sample_time(sample_per_second);
+  sample_per_second = 4;
+  sample_time = set_sample_time(sample_per_second);
   for (int i = 0; i<N_OUTPUTS; i++){
     all_pids[i].SetMode(all_pids[i].Control::manual);
     all_pids[i].SetOutputLimits(0, 255);
@@ -171,7 +173,7 @@ uint32_t set_sample_time(uint32_t sample_per_second){
     all_pids[i].SetSampleTimeUs(sample_time);
   }
 
-  return sample_time
+  return sample_time;
 }
 
 void get_moving_average(void){
@@ -376,7 +378,7 @@ void parseString(String inputString){
   int lastcomma;
   int nextcomma;
   int command;
-  String ok_string = "{}115!";
+  String ok_string = "{}115,!";
 
   if(new_command){
     String ADDR = inputString.substring(0, inputString.indexOf(' '));
@@ -390,13 +392,13 @@ void parseString(String inputString){
         send_board_info();
       }
 
-      if(command == UPDATE_SAMPLES_PER_SECONDS){
-//      GET_BOARD_INFO: "r101 2,SAMPLES_PER_SECOND,!"
-        lastcomma = firstcomma;
-        nextcomma = inputString.indexOf(',', lastcomma + 1);
-        uint32_t samples_per_second = inputString.substring(lastcomma + 1, nextcomma).toInt();
-        sample_time = set_sample_time(samples_per_second)
-      }
+//      if(command == UPDATE_SAMPLES_PER_SECONDS){
+////      GET_BOARD_INFO: "r101 2,SAMPLES_PER_SECOND,!"
+//        lastcomma = firstcomma;
+//        nextcomma = inputString.indexOf(',', lastcomma + 1);
+//        uint32_t samples_per_second = inputString.substring(lastcomma + 1, nextcomma).toInt();
+//        sample_time = set_sample_time(samples_per_second)
+//      }
 
       if(command == TOGGLE_CONTROL_MODE){
 //      MANUAL: "r101, 1,0,OUT_CHANNEL,PWM,!"

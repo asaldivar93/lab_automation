@@ -10,6 +10,11 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plot
 import pandas as pd
 
+
+a = sqlite_db.cursor.execute("SELECT * FROM test").fetchall()
+pd.DataFrame(a)
+
+
 # Initialize figure
 experiment = '20231218_calibracion_pid_temp2'
 figure = plot.figure(constrained_layout=True)
