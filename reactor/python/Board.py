@@ -26,7 +26,7 @@ valid_commands = {
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
 valid_input_types = ["analog", "i2c", "spi", "pulses", "flow"]
-valid_output_types = ["pwm", "digital", "speed"]
+valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "speed": range(0, 1000)}
 
 
 class Dictlist(list):
@@ -50,17 +50,17 @@ class config_handler(FileSystemEventHandler):
 
 
 class Output():
-    def __init__(self, type: str, channel: float, pin: float, control_mode: str = "MANUAL"):
-        validate_output_type(type)
-        validate_control_mode(control_mode)
-        self.id = type + "_" + str(channel)
+    def __init__(self, address: str, type: str,
+                 channel: float, pin: float):
+        self.address = address
+        self.id = address + type + "_" + str(channel)
         self.type = type
-        self.control_mode = control_mode
         self.channel = channel
         self.pin = pin
+        self.bounds = valid_output_types[type]
 
     def __repr__(self):
-        return f"Output(type={self.type}, channel={self.channel}, pin={self.pin}, control_mode={self.control_mode})"
+        return f"Output(id={self.id}, channel={self.channel}, pin={self.pin})"
 
 
 class Input():
@@ -82,8 +82,8 @@ class Board():
         self.set_baud_rate(baud_rate)
         self.open_connection()
 
-        print("Connection successfull\n")
         board_info_dict = self.request_board_info()
+        print("Connection successfull\n")
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
 
@@ -102,15 +102,14 @@ class Board():
         self.serial_port = serial.Serial(port=self.port_name, baudrate=self.baud_rate, timeout=2)
 
     def request_board_info(self):
-        board_info_str = self.write("GET_BOARD_INFO")
+        board_info_str = self.write_command(self.address, "GET_BOARD_INFO")
         return self.load_json_to_dict(board_info_str)
 
     def set_outputs(self, board_info):
         outputs_list = []
-        for type, channel, pin, mode in board_info["outputs"]:
-            validate_output_type(type)
-            control_mode = list(valid_control_modes.keys())[mode]
-            outputs_list.extend([Output(type, channel, pin, control_mode)])
+        print(board_info)
+        for address, type, channel, pin in board_info["outputs"]:
+            outputs_list.extend([Output(address, type, channel, pin)])
         self.Outputs = Dictlist(outputs_list)
 
         print(f"{len(self.Outputs)} output channels detected:")
@@ -163,15 +162,16 @@ class Board():
             command = "UPDATE_CONFIGURATION"
             args_queue = self.parse_config(self.config_dict)
             while args_queue:
-                self.write(command, args_queue[0])
+                address, args = args_queue[0]
+                self.write_command(address, command, args)
                 args_queue.pop(0)
             self.is_config_updated = False
             print("Board configuration updated")
             logging.info("Board configuration updated")
 
-    def write(self, command: str, args: list = None):
+    def write_command(self, address: str, command: str, args: list = None):
         confirmation = False
-        cmd_str = self.build_cmd_str(command, args)
+        cmd_str = self.build_cmd_str(address, command, args)
         while not confirmation:
             self.serial_port.write(cmd_str.encode())
             self.serial_port.flush()
@@ -187,7 +187,7 @@ class Board():
         conditions = [input_string[0] == "{", "115,!" in input_string]
         return all(conditions)
 
-    def build_cmd_str(self, command: str, args: list = None):
+    def build_cmd_str(self, address: str, command: str, args: list = None):
         """
         Build a command string that can be sent to the arduino.
 
@@ -205,7 +205,7 @@ class Board():
             args = ','.join(map(str, args))
         else:
             args = ''
-        return self.address + " {cmd},{args},!\n".format(cmd=cmd, args=args)
+        return f"{address} {cmd},{args},!\n"
 
     def start_config_observer(self):
         self.config_observer = Observer()
@@ -217,7 +217,9 @@ class Board():
         args_queue = []
         for channel_id in config_dict.keys():
             try:
-                out_channel = self.Outputs.get_by_id(channel_id).channel
+                output_i = self.Outputs.get_by_id(channel_id)
+                out_channel = output_i.channel
+                address = output_i.address
             except KeyError:
                 logging.warning(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
             else:
@@ -225,14 +227,14 @@ class Board():
                     case {"mode": "MANUAL", "value": value}:
                         control_mode = valid_control_modes["MANUAL"]
                         if isinstance(value, int):
-                            args_queue.append([control_mode, out_channel, value])
+                            args_queue.append([address, [control_mode, out_channel, value]])
                         else:
                             logging.warning(f"In {channel_id}, value must be of type(int)")
 
                     case {"mode": "TIMER", "value": value, "time_on": time_on, "time_off": time_off}:
                         control_mode = valid_control_modes["TIMER"]
                         if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
-                            args_queue.append([control_mode, out_channel, time_on, time_off, value])
+                            args_queue.append([address, [control_mode, out_channel, time_on, time_off, value]])
                         else:
                             logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
 
@@ -244,7 +246,7 @@ class Board():
                             logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                         else:
                             if isinstance(setpoint, (float, int)):
-                                args_queue.append([control_mode, out_channel, in_channel, setpoint])
+                                args_queue.append([address, [control_mode, out_channel, in_channel, setpoint]])
                             else:
                                 logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
 
@@ -256,7 +258,7 @@ class Board():
                             logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                         else:
                             if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
-                                args_queue.append([control_mode, out_channel, in_channel, lower_bound, upper_bound, value])
+                                args_queue.append([address, [control_mode, out_channel, in_channel, lower_bound, upper_bound, value]])
                             else:
                                 logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
 
@@ -316,13 +318,6 @@ def validate_baud_rate(baud_rate: str) -> bool:
 def validate_input_type(type: str) -> bool:
     if type not in valid_input_types:
         raise ValueError(f"type must be one of {valid_input_types}")
-
-    return True
-
-
-def validate_output_type(type: str) -> bool:
-    if type not in valid_output_types:
-        raise ValueError(f"type must be one of {valid_output_types}")
 
     return True
 

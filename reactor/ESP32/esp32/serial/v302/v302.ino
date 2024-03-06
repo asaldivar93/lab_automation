@@ -27,6 +27,7 @@
 #define LEDC_BASE_FREQ 800
 
 typedef struct{
+  String address;
   String type;
   int channel;
   int pin;
@@ -49,10 +50,23 @@ typedef struct{
   float value;
 } input;
 
+String ADDRESS = "M0";
+boolean new_command = false;
+String inputString = "";
+
+// Measurment Variables
+unsigned long analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
+boolean READING = false;
+float sample_number;
+float ref_voltage = 3.3;
+uint32_t sample_per_second = 4;
+uint32_t sample_time;
+
+// Config Data
 output outputs[N_OUTPUTS] =
-  {{"pwm", 0, 13, MANUAL, 0}, {"pwm", 1, 12, MANUAL, 0},
-   {"pwm", 2, 14, MANUAL, 0}, {"pwm", 3, 27, MANUAL, 0},
-   {"pwm", 4, 26, MANUAL, 0}, {"pwm", 5, 15, MANUAL, 0}};
+  {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
+   {ADDRESS, "pwm", 2, 14, MANUAL, 0}, {ADDRESS, "pwm", 3, 27, MANUAL, 0},
+   {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 15, MANUAL, 0}};
 
 input inputs[N_INPUTS] =
   {{"analog", 0, "current", 0}, {"analog", 1, "dissolved_oxygen", 0},
@@ -60,24 +74,11 @@ input inputs[N_INPUTS] =
    {"analog", 4, "temperature_1", 0}, {"analog", 5, "temperature_2", 0},
    {"analog", 6, "temperature_3", 0}, {"analog", 7, "temperature_4", 0}};
 
-boolean         new_command = false;
-String          ADDRESS = "r101";
-String          inputString = "";
-
-// Measurment Variables
-unsigned long   analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
-float           sample_number;
-boolean         READING = false;
-float           ref_voltage = 3.3;
-uint32_t sample_per_second = 4;
-uint32_t sample_time;
-
 // PID values
 float           Kp = 100;
 float           Ki = 0.2;
 float           Kd = 0.;
 
-// outputs
 float manual_outputs[6];
 float pid_filter[6], pid_output[6], pid_setpoint[6];
 QuickPID PID_0(&pid_filter[0], &pid_output[0], &pid_setpoint[0]);
@@ -91,7 +92,6 @@ QuickPID all_pids[6] = {PID_0, PID_1, PID_2, PID_3, PID_4, PID_5};
 // MCP Object
 MCP3208 ADC1(MCP_DOUT, MCP_DIN, MCP_CLK);
 
-
 // Timer Callback function
 esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
@@ -101,6 +101,7 @@ void read_temp(void *p) {
 
 void setup() {
   Serial.begin(230400);
+  Serial2.begin(230400, SERIAL_8N1, 16, 17);
 
   // MCP3208 instance
   ADC1.begin(CS1);
@@ -336,10 +337,10 @@ void send_board_info(void){
 
   for(byte i=0; i < N_OUTPUTS; i++){
     outputs_json = outputs_json + "(";
+    outputs_json = outputs_json + "'" + outputs[i].address + "',";
     outputs_json = outputs_json + "'" + outputs[i].type + "',";
     outputs_json = outputs_json + outputs[i].channel + ",";
-    outputs_json = outputs_json + outputs[i].pin + ",";
-    outputs_json = outputs_json + outputs[i].control_mode;
+    outputs_json = outputs_json + outputs[i].pin;
     outputs_json = outputs_json + "),";
   }
   outputs_json = outputs_json + "]";
@@ -373,6 +374,7 @@ void parseSerial(void){
   }
 }
 
+
 void parseString(String inputString){
   int firstcomma;
   int lastcomma;
@@ -388,12 +390,12 @@ void parseString(String inputString){
       command = inputString.substring(inputString.indexOf(' '), firstcomma).toInt();
 
       if(command == GET_BOARD_INFO){
-//      GET_BOARD_INFO: "r101 0,!"
+//      GET_BOARD_INFO: "ADDR 0,!"
         send_board_info();
       }
 
 //      if(command == UPDATE_SAMPLES_PER_SECONDS){
-////      GET_BOARD_INFO: "r101 2,SAMPLES_PER_SECOND,!"
+////      GET_BOARD_INFO: "ADDR 2,SAMPLES_PER_SECOND,!"
 //        lastcomma = firstcomma;
 //        nextcomma = inputString.indexOf(',', lastcomma + 1);
 //        uint32_t samples_per_second = inputString.substring(lastcomma + 1, nextcomma).toInt();
@@ -401,10 +403,10 @@ void parseString(String inputString){
 //      }
 
       if(command == TOGGLE_CONTROL_MODE){
-//      MANUAL: "r101, 1,0,OUT_CHANNEL,PWM,!"
-//      TIMER:  "r101, 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
-//      PID:    "r101, 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
-//      ONOFF:  "r101, 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
+//      MANUAL: "ADDR, 1,0,OUT_CHANNEL,PWM,!"
+//      TIMER:  "ADDR, 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
+//      PID:    "ADDR, 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
+//      ONOFF:  "ADDR, 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
 
         lastcomma = firstcomma;
         nextcomma = inputString.indexOf(',', lastcomma + 1);
@@ -491,6 +493,9 @@ void parseString(String inputString){
           }
         }
       }
+    else{
+      Serial2.println(inputString);
+    }
     inputString = "";
     new_command = false;
     }

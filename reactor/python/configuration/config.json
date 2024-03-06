@@ -1,30 +1,30 @@
 {
-  "pwm_0": {"mode": "MANUAL", "value": 100,
+  "M0pwm_0": {"mode": "MANUAL", "value": 0,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null
           },
-  "pwm_1": {"mode": "MANUAL", "value": 0,
+  "M0pwm_1": {"mode": "MANUAL", "value": 0,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null
           },
-  "pwm_2": {"mode": "MANUAL", "value": 0,
+  "M0pwm_2": {"mode": "MANUAL", "value": 0,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null
           },
-  "pwm_3": {"mode": "MANUAL", "value": 0,
+  "M0pwm_3": {"mode": "MANUAL", "value": 0,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null
           },
-  "pwm_4": {"mode": "MANUAL", "value": 0,
+  "M0pwm_4": {"mode": "MANUAL", "value": 0,
             "time_on": null, "time_off": null,
             "variable": null, "setpoint": null,
             "lower_bound": null, "upper_bound": null
           },
-  "pwm_5": {"mode": "MANUAL", "value": 0,
+  "M0pwm_5": {"mode": "MANUAL", "value": 0,
   		      "time_on": null, "time_off": null,
   		      "variable": null, "setpoint": null,
   		      "lower_bound": null, "upper_bound": null

@@ -11,7 +11,7 @@ import Board
 import Handle
 
 sqlite_db = Handle.Database(DATABASE_PATH="database.db")
-board = Board.Board(address="r101", baud_rate=230400,
+board = Board.Board(address="M0", baud_rate=230400,
                     port_name="/dev/ttyUSB0")
 
 experiment = Handle.Experiment(name="test", sqlite_db=sqlite_db,
