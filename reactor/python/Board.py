@@ -11,14 +11,19 @@ import ast
 import json
 import logging
 import os
+import time
 
 from serial.tools import list_ports
 from serial.serialutil import SerialException
-
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 import serial
+
+logging.basicConfig(
+    filename="record.log", encoding='utf-8',
+    level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s'
+)
 
 valid_baud_rates = [230400]
 valid_commands = {
@@ -84,6 +89,7 @@ class Board():
 
         board_info_dict = self.request_board_info()
         print("Connection successfull\n")
+        logging.info("Connection successfull\n")
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
 
@@ -107,14 +113,13 @@ class Board():
 
     def set_outputs(self, board_info):
         outputs_list = []
-        print(board_info)
         for address, type, channel, pin in board_info["outputs"]:
             outputs_list.extend([Output(address, type, channel, pin)])
         self.Outputs = Dictlist(outputs_list)
 
-        print(f"{len(self.Outputs)} output channels detected:")
+        print(f"\n{len(self.Outputs)} output channels detected:")
         for i in self.Outputs:
-            print(i)
+            logging.info(i)
 
     def set_inputs(self, board_info):
         inputs_list = []
@@ -123,9 +128,9 @@ class Board():
             inputs_list.extend([Input(type, channel, variable)])
         self.Inputs = Dictlist(inputs_list)
 
-        print(f"{len(self.Inputs)} input channels detected:")
+        print(f"\n{len(self.Inputs)} input channels detected:")
         for i in self.Inputs:
-            print(i)
+            logging.info(i)
 
     def read_config_json(self):
         with open(os.path.join(self.config_dir, "config.json"), "r") as file:
@@ -275,23 +280,20 @@ class Board():
         time.sleep(1)
         self.serial_port.close()
         time.sleep(2)
-        print("Serial Port Closed")
-        self.serial_port = None
+        logging.warning("Serial Port Dissconected")
 
         while self.serial_port is None:
             time.sleep(5)
             print('Opening connection')
             try:
-                ports = list_ports.comports()
-                self.port = ports[0].device
                 self.serial_port = serial.Serial(
-                    port=self.port, baudrate=self.baud, timeout=2
+                    port=self.serial_port, baudrate=self.baud, timeout=2
                 )
-            except IndexError:
-                print("Line connection Lost")
+            except SerialException:
+                print(get_available_serial_ports())
         self.serial_port.flushInput()
         self.serial_port.flushOutput()
-        print("Device Connected")
+        logging.warning("Device Reconneted")
         time.sleep(0.5)
 
 

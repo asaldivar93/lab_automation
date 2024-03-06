@@ -25,3 +25,4 @@ results/
 *.tsv
 *.csv
 *.ipynb
+*.log
