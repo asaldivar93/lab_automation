@@ -157,7 +157,10 @@ class Board():
 
     def load_json_to_dict(self, json_string: str) -> dict:
         valid_json_string = self.convert_input_string_to_json(json_string)
-        return ast.literal_eval(valid_json_string)
+        try:
+            return ast.literal_eval(valid_json_string)
+        except SyntaxError:
+            return {}
 
     def convert_input_string_to_json(self, input_string: str) -> str:
         return input_string.replace("115,!", "").replace("'", '"').replace(", }", "}").replace("100,!", "")

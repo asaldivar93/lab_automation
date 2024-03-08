@@ -8,6 +8,7 @@ Created on Wed Apr  1 18:27:31 2020
 from datetime import datetime
 
 from matplotlib.animation import FuncAnimation
+from sqlite3 import OperationalError
 
 import matplotlib.pyplot as plot
 import pandas as pd
@@ -17,6 +18,7 @@ import Handle
 
 class Plotter:
     def __init__(self, experiment_name: str, DATABASE_PATH: str = "database.db", time_units: str = "hours"):
+        self.db_path = DATABASE_PATH
         self.experiment = experiment_name
         self.time_units = time_units
         self.sqlite_db = self.connect_to_db(DATABASE_PATH)
@@ -38,9 +40,13 @@ class Plotter:
 
     def get_data(self, time_span: float = 24):
         query_str = f"SELECT * FROM {self.experiment} WHERE date >= datetime('now', 'localtime', '-24 {self.time_units}') AND ROWID % 4 = 0"
-        data_df = pd.DataFrame(
-            self.sqlite_db.cursor.execute(query_str)
-        )
+        try:
+            data_df = pd.DataFrame(
+                self.sqlite_db.cursor.execute(query_str)
+            )
+        except OperationalError:
+            self.sqlite_db.connection.close()
+            self.sqlite_db = self.connect_to_db(self.db_path)
 
         return data_df
 
@@ -96,7 +102,7 @@ class Plotter:
     def set_ax_11_data(self, time, variables: list):
         for i in range(0, len(variables)):
             data_y = self.data_df.loc[:, variables[i]]
-            self.ax_10_ln[i].set_data(time, data_y)
+            self.ax_11_ln[i].set_data(time, data_y)
 
     def set_ax_00_vars(self, variables: list):
         self.ax_00_vars = variables
@@ -166,5 +172,7 @@ if __name__ == "__main__":
     figure, grid = plotter.create_figure()
     plotter.create_axes(figure, grid)
 
-    ani = FuncAnimation(figure, plotter.update, init_func=plotter.init, interval=1000 * 1)
+    ani = FuncAnimation(figure, plotter.update,
+                        init_func=plotter.init, interval=1000 * 1,
+                        cache_frame_data=False)
     plot.show()
