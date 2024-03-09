@@ -59,7 +59,7 @@ unsigned long analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator var
 boolean READING = false;
 float sample_number;
 float ref_voltage = 3.3;
-uint32_t sample_per_second = 4;
+uint32_t samples_per_second = 4;
 uint32_t sample_time;
 
 // Config Data
@@ -116,8 +116,8 @@ void setup() {
     }
   }
 
-  sample_per_second = 4;
-  sample_time = set_sample_time(sample_per_second);
+  samples_per_second = 4;
+  sample_time = set_sample_time(samples_per_second);
   for (int i = 0; i<N_OUTPUTS; i++){
     all_pids[i].SetMode(all_pids[i].Control::manual);
     all_pids[i].SetOutputLimits(0, 255);
@@ -168,8 +168,8 @@ void loop() {
 }
 
 
-uint32_t set_sample_time(uint32_t sample_per_second){
-  uint32_t sample_time = 1000000 / sample_per_second;
+uint32_t set_sample_time(uint32_t samples_per_second){
+  uint32_t sample_time = 1000000 / samples_per_second;
   for (int i = 0; i<N_OUTPUTS; i++){
     all_pids[i].SetSampleTimeUs(sample_time);
   }
@@ -340,7 +340,7 @@ void send_board_info(void){
     outputs_json = outputs_json + "'" + outputs[i].address + "',";
     outputs_json = outputs_json + "'" + outputs[i].type + "',";
     outputs_json = outputs_json + outputs[i].channel + ",";
-    outputs_json = outputs_json + outputs[i].pin;
+    outputs_json = outputs_json + outputs[i].control_mode;
     outputs_json = outputs_json + "),";
   }
   outputs_json = outputs_json + "]";
@@ -356,7 +356,7 @@ void send_board_info(void){
   }
   inputs_json = inputs_json + "]";
 
-  String all_data_json = "{'address': '" + ADDRESS + "', ";
+  String all_data_json = "{'address': '" + ADDRESS + "', samples_per_second:" + samples_per_second;
   all_data_json = all_data_json + outputs_json + ", " + inputs_json;
   all_data_json = all_data_json + "}115,!";
   Serial.println(all_data_json);

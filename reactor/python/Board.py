@@ -56,16 +56,16 @@ class config_handler(FileSystemEventHandler):
 
 class Output():
     def __init__(self, address: str, type: str,
-                 channel: float, pin: float):
+                 channel: float, control_mode: float):
         self.address = address
         self.id = address + type + "_" + str(channel)
         self.type = type
         self.channel = channel
-        self.pin = pin
+        self.control_mode = control_mode
         self.bounds = valid_output_types[type]
 
     def __repr__(self):
-        return f"Output(id={self.id}, channel={self.channel}, pin={self.pin})"
+        return f"Output(id={self.id}, channel={self.channel}, control_mode={self.control_mode})"
 
 
 class Input():
@@ -88,10 +88,12 @@ class Board():
         self.open_connection()
 
         board_info_dict = self.request_board_info()
-        print("Connection successfull\n")
-        logging.info("Connection successfull\n")
+        self.samples_per_second = board_info_dict["samples_per_second"]
+
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
+        print("Connection successfull\n")
+        logging.info("Connection successfull\n")
 
         self.config_dir = "configuration/"
         self.read_config_json()
@@ -113,13 +115,13 @@ class Board():
 
     def set_outputs(self, board_info):
         outputs_list = []
-        for address, type, channel, pin in board_info["outputs"]:
-            outputs_list.extend([Output(address, type, channel, pin)])
+        for address, type, channel, mode in board_info["outputs"]:
+            outputs_list.extend([Output(address, type, channel, mode)])
         self.Outputs = Dictlist(outputs_list)
 
         print(f"\n{len(self.Outputs)} output channels detected:")
         for i in self.Outputs:
-            logging.info(i)
+            print(i)
 
     def set_inputs(self, board_info):
         inputs_list = []
@@ -130,7 +132,7 @@ class Board():
 
         print(f"\n{len(self.Inputs)} input channels detected:")
         for i in self.Inputs:
-            logging.info(i)
+            print(i)
 
     def read_config_json(self):
         with open(os.path.join(self.config_dir, "config.json"), "r") as file:
@@ -228,47 +230,58 @@ class Board():
                 output_i = self.Outputs.get_by_id(channel_id)
                 out_channel = output_i.channel
                 address = output_i.address
+                current_control = output_i.control_mode
             except KeyError:
                 logging.warning(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
             else:
                 match config_dict[channel_id]:
                     case {"mode": "MANUAL", "value": value}:
                         control_mode = valid_control_modes["MANUAL"]
-                        if isinstance(value, int):
-                            args_queue.append([address, [control_mode, out_channel, value]])
-                        else:
-                            logging.warning(f"In {channel_id}, value must be of type(int)")
+                        if not control_mode == current_control:
+                            if isinstance(value, int):
+                                args_queue.append([address, [control_mode, out_channel, value]])
+                                output_i.control_mode = control_mode
+                            else:
+                                logging.warning(f"In {channel_id}, value must be of type(int)")
 
                     case {"mode": "TIMER", "value": value, "time_on": time_on, "time_off": time_off}:
                         control_mode = valid_control_modes["TIMER"]
-                        if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
-                            args_queue.append([address, [control_mode, out_channel, time_on, time_off, value]])
-                        else:
-                            logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
+                        if not control_mode == current_control:
+                            if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
+                                time_on = time_on * self.samples_per_second
+                                time_off = time_off * self.samples_per_second
+                                args_queue.append([address, [control_mode, out_channel, time_on, time_off, value]])
+                                output_i.control_mode = control_mode
+                            else:
+                                logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
 
                     case {"mode": "PID", "setpoint": setpoint, "variable": variable}:
                         control_mode = valid_control_modes["PID"]
-                        try:
-                            in_channel = self.Inputs.get_by_id(variable).channel
-                        except KeyError:
-                            logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
-                        else:
-                            if isinstance(setpoint, (float, int)):
-                                args_queue.append([address, [control_mode, out_channel, in_channel, setpoint]])
+                        if not control_mode == current_control:
+                            try:
+                                in_channel = self.Inputs.get_by_id(variable).channel
+                            except KeyError:
+                                logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
-                                logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
+                                if isinstance(setpoint, (float, int)):
+                                    args_queue.append([address, [control_mode, out_channel, in_channel, setpoint]])
+                                    output_i.control_mode = control_mode
+                                else:
+                                    logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
 
                     case {"mode": "ONOFF", "value": value, "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound}:
                         control_mode = valid_control_modes["ONOFF"]
-                        try:
-                            in_channel = self.Inputs.get_by_id(variable).channel
-                        except KeyError:
-                            logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
-                        else:
-                            if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
-                                args_queue.append([address, [control_mode, out_channel, in_channel, lower_bound, upper_bound, value]])
+                        if not control_mode == current_control:
+                            try:
+                                in_channel = self.Inputs.get_by_id(variable).channel
+                            except KeyError:
+                                logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
-                                logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
+                                if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
+                                    args_queue.append([address, [control_mode, out_channel, in_channel, lower_bound, upper_bound, value]])
+                                    output_i.control_mode = control_mode
+                                else:
+                                    logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
 
                     case {"mode": mode}:
                         logging.warning(f"{mode} mode must be on of {valid_control_modes}")
