@@ -162,10 +162,10 @@ class Plotter:
 
 
 if __name__ == "__main__":
-    plotter = Plotter(experiment_name="test", time_units="minutes")
+    plotter = Plotter(experiment_name="test", time_units="seconds")
 
     plotter.set_ax_00_vars(["temperature_0", "temperature_1"])
-    plotter.set_ax_01_vars(["pwm_0"])
+    plotter.set_ax_01_vars(["M0pwm_0"])
     plotter.set_ax_10_vars(["dissolved_oxygen"])
     plotter.set_ax_11_vars(["ph"])
 

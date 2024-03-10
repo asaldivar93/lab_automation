@@ -20,12 +20,12 @@ from watchdog.events import FileSystemEventHandler
 
 import serial
 
-logging.basicConfig(
-    filename="record.log", encoding='utf-8',
-    level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s'
-)
+# logging.basicConfig(
+#     filename="record.log", encoding='utf-8',
+#     level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s'
+# )
 
-valid_baud_rates = [230400]
+valid_baud_rates = [230400, 115200, 74880, 57600, 38400, 19200, 9600]
 valid_commands = {
     "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1,
 }
@@ -172,6 +172,7 @@ class Board():
             command = "UPDATE_CONFIGURATION"
             args_queue = self.parse_config(self.config_dict)
             while args_queue:
+                print(args_queue[0])
                 address, args = args_queue[0]
                 self.write_command(address, command, args)
                 args_queue.pop(0)
@@ -295,18 +296,18 @@ class Board():
 
         time.sleep(1)
         self.serial_port.close()
+        self.serial_port = None
         time.sleep(2)
         logging.warning("Serial Port Dissconected")
-
+        logging.warning('Opening connection')
         while self.serial_port is None:
             time.sleep(5)
-            print('Opening connection')
+
             try:
-                self.serial_port = serial.Serial(
-                    port=self.serial_port, baudrate=self.baud, timeout=2
-                )
+                self.open_connection()
             except SerialException:
-                print(get_available_serial_ports())
+                logging.warning(f"Unsuccessfull: {get_available_serial_ports()}")
+
         self.serial_port.flushInput()
         self.serial_port.flushOutput()
         logging.warning("Device Reconneted")

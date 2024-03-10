@@ -306,7 +306,7 @@ String write_outputs_json(void){
 
   for(byte i=0; i < N_OUTPUTS; i++){
     outputs_json = outputs_json + "(";
-    outputs_json = outputs_json + "'" + outputs[i].type + "',";
+    outputs_json = outputs_json + "'" + ADDRESS + outputs[i].type + "',";
     outputs_json = outputs_json + outputs[i].channel + ",";
     outputs_json = outputs_json + outputs[i].value;
     outputs_json = outputs_json + "),";
@@ -356,7 +356,7 @@ void send_board_info(void){
   }
   inputs_json = inputs_json + "]";
 
-  String all_data_json = "{'address': '" + ADDRESS + "', samples_per_second:" + samples_per_second;
+  String all_data_json = "{'address': '" + ADDRESS + "', 'samples_per_second': " + samples_per_second + ", ";
   all_data_json = all_data_json + outputs_json + ", " + inputs_json;
   all_data_json = all_data_json + "}115,!";
   Serial.println(all_data_json);
