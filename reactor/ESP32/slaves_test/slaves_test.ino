@@ -22,6 +22,11 @@
 #define MCP_DIN  19
 #define CS1      23
 
+// MAX485 PINS
+#define TRANSMIT 15
+#define Rx 16
+#define Tx 17
+
 // PWM PARAMETERS
 #define LEDC_BIT 8
 #define LEDC_BASE_FREQ 800
@@ -50,7 +55,7 @@ typedef struct{
   float value;
 } input;
 
-String ADDRESS = "M0";
+String ADDRESS = "S2";
 boolean new_command = false;
 String inputString = "";
 
@@ -64,7 +69,7 @@ uint32_t sample_time;
 
 // Config Data
 output outputs[N_OUTPUTS] =
-  {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
+  {{ADDRESS, "pwm", 0, 2, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
    {ADDRESS, "pwm", 2, 14, MANUAL, 0}, {ADDRESS, "pwm", 3, 27, MANUAL, 0},
    {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 15, MANUAL, 0}};
 
@@ -100,12 +105,10 @@ void read_temp(void *p) {
 }
 
 void setup() {
-  Serial.begin(230400);
-  Serial2.begin(230400, SERIAL_8N1, 16, 17);
-
-  // MCP3208 instance
-  ADC1.begin(CS1);
-  ADC1.setSPIspeed(1000000);
+  Serial.begin(57600);
+  Serial2.begin(9600, SERIAL_8N1, Rx, Tx);
+  pinMode(TRANSMIT, OUTPUT);
+  digitalWrite(TRANSMIT, LOW);
 
   // PWM Setup
   for(int i=0; i<N_OUTPUTS; i++){
@@ -118,24 +121,6 @@ void setup() {
 
   samples_per_second = 4;
   sample_time = set_sample_time(samples_per_second);
-  for (int i = 0; i<N_OUTPUTS; i++){
-    all_pids[i].SetMode(all_pids[i].Control::manual);
-    all_pids[i].SetOutputLimits(0, 255);
-    all_pids[i].SetTunings(Kp, Ki, Kd);
-    all_pids[i].SetSampleTimeUs(sample_time);
-    all_pids[i].SetAntiWindupMode(all_pids[i].iAwMode::iAwClamp);
-  }
-
-  get_moving_average();
-  inputs[0].value = get_current();
-  inputs[1].value = get_dissolved_oxygen();
-  inputs[2].value = get_ph();
-  get_temperatures();
-  delay(500);
-  new_command = true;
-  inputString = "r101 1,2,3,4,51.5,!";
-  parseString(inputString);
-  reset_moving_average();
 
   // Start Timer
   create_args.callback = read_temp; // Set esp-timer argument
@@ -144,27 +129,11 @@ void setup() {
 }
 
 void loop() {
-
-  if (!READING){
-    get_moving_average();
-  }
-
-  if (READING) {
-    inputs[0].value = get_current();
-    inputs[1].value = get_dissolved_oxygen();
-    inputs[2].value = get_ph();
-    get_temperatures();
-    set_output_vals();
-    send_data();
-    reset_moving_average();
-
-    // Restart Timer
-    esp_timer_start_once(timer_handle, sample_time);
-    READING = false;
-  }
+  set_output_vals();
   parseSerial();
   parseString(inputString);
   inputString = "";
+  delay(10);
 }
 
 
@@ -297,7 +266,7 @@ void send_data(void){
   String all_data_json = "{'address': '" + ADDRESS + "', ";
   all_data_json = all_data_json + outputs_json + ", " + inputs_json;
   all_data_json = all_data_json + "}100,!";
-  Serial.println(all_data_json);
+  Serial2.println(all_data_json);
 }
 
 
@@ -359,13 +328,13 @@ void send_board_info(void){
   String all_data_json = "{'address': '" + ADDRESS + "', 'samples_per_second': " + samples_per_second + ", ";
   all_data_json = all_data_json + outputs_json + ", " + inputs_json;
   all_data_json = all_data_json + "}115,!";
-  Serial.println(all_data_json);
+  Serial2.println(all_data_json);
 }
 
 
 void parseSerial(void){
-  while(Serial.available()){
-    char inChar = char(Serial.read());
+  while(Serial2.available()){
+    char inChar = char(Serial2.read());
     inputString += inChar;
     if(inChar == '!'){
       new_command = true;
@@ -384,8 +353,10 @@ void parseString(String inputString){
 
   if(new_command){
     String ADDR = inputString.substring(0, inputString.indexOf(' '));
+    Serial.println(inputString);
 
     if(ADDR == ADDRESS){
+      Serial.println(ADDR);
       firstcomma = inputString.indexOf(',');
       command = inputString.substring(inputString.indexOf(' '), firstcomma).toInt();
 
@@ -425,7 +396,7 @@ void parseString(String inputString){
 
             manual_outputs[out_channel] = value;
             all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
-            Serial.println(ok_string);
+            //Serial2.println(ok_string);
             break;
           }
 
@@ -447,7 +418,7 @@ void parseString(String inputString){
             outputs[out_channel].delta_time = 0;
             outputs[out_channel].current_timer = outputs[out_channel].time_on;
             outputs[out_channel].is_on = true;
-            Serial.println(ok_string);
+            //Serial2.println(ok_string);
             break;
           }
 
@@ -464,7 +435,7 @@ void parseString(String inputString){
 
             outputs[out_channel].input_val = &inputs[in_channel].value;
             pid_filter[out_channel] = inputs[in_channel].value;
-            Serial.println(ok_string);
+            //Serial2.println(ok_string);
             break;
           }
 
@@ -488,14 +459,11 @@ void parseString(String inputString){
             all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
 
             outputs[out_channel].input_val = &inputs[in_channel].value;
-            Serial.println(ok_string);
+            //Serial2.println(ok_string);
             break;
           }
         }
       }
-    else{
-      Serial2.println(inputString);
-    }
     inputString = "";
     new_command = false;
     }

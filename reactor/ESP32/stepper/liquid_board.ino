@@ -7,29 +7,30 @@ String          ADDRESS = "r102";
 String          inputString = "";
 float           setpoint[4] = {0, 0, 0, 0};
 
-#define MS1       26
-#define MS2       25
-#define MS3       33
-#define STEP      32
-#define DIR       35
+#define MS1       13
+#define MS2       12
+#define MS3       14
+#define STEP      27
+#define DIR       26
 
 #define MAX_SPEED 1000
 
-AccelStepper PUMP_0(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
+AccelStepper PUMP_0(AccelStepper::DRIVER, STEP, DIR);
 
 void setup() {
   Serial.begin(230400);
   //Serial2.begin(230400, SERIAL_8N1, 16, 17);
-  mpr.begin();
 
   pinMode(STEP, OUTPUT);
+  pinMode(DIR, OUTPUT);
   pinMode(MS1, OUTPUT);
   pinMode(MS2, OUTPUT);
   pinMode(MS3, OUTPUT);
 
-  digitalWrite(MS1, HIGH);
-  digitalWrite(MS2, HIGH);
-  digitalWrite(MS3, HIGH);
+  pinMode(DIR, LOW);
+  digitalWrite(MS1, LOW);
+  digitalWrite(MS2, LOW);
+  digitalWrite(MS3, LOW);
 
   PUMP_0.setMaxSpeed(MAX_SPEED);
   PUMP_0.setSpeed(setpoint[0]);

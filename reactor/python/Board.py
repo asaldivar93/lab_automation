@@ -172,7 +172,6 @@ class Board():
             command = "UPDATE_CONFIGURATION"
             args_queue = self.parse_config(self.config_dict)
             while args_queue:
-                print(args_queue[0])
                 address, args = args_queue[0]
                 self.write_command(address, command, args)
                 args_queue.pop(0)

@@ -121,7 +121,7 @@ class Experiment():
         )
         return columns_list
 
-    def get_sample_period(self, period_time_seconds: int = 1) -> int:
+    def get_sample_period(self, period_time_seconds: float = 1) -> int:
         """
         Calculates the time between saves to the database. This function uses
         the sampling frequency of the boart to calculate the number of samples
@@ -132,7 +132,7 @@ class Experiment():
             database
 
         Output:
-            sample_number: the number of samples recieved in in each perieod
+            sample_number: the number of samples recieved in in each period
         """
         return self.board.samples_per_second * period_time_seconds
 

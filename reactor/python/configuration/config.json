@@ -1,7 +1,7 @@
 {
-  "M0pwm_0": {"mode": "MANUAL", "value": 0,
+  "M0pwm_0": {"mode": "PID", "value": 0,
             "time_on": null, "time_off": null,
-            "variable": null, "setpoint": null,
+            "variable": "temperature_0", "setpoint": 51,
             "lower_bound": null, "upper_bound": null
           },
   "M0pwm_1": {"mode": "MANUAL", "value": 0,

@@ -14,11 +14,11 @@ sqlite_db = Handle.Database(DATABASE_PATH="database.db")
 board = Board.Board(address="M0", baud_rate=230400,
                     port_name="/dev/ttyUSB0")
 
-experiment = Handle.Experiment(name="test", sqlite_db=sqlite_db,
+experiment = Handle.Experiment(name="test2", sqlite_db=sqlite_db,
                                board=board)
 
 experiment.board.start_config_observer()
-sample_period = experiment.get_sample_period(period_time_seconds=1)
+sample_period = experiment.get_sample_period(period_time_seconds=0.25)
 sample_counter = 0
 while True:
     try:
