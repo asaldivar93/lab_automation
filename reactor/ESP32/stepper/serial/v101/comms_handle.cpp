@@ -42,9 +42,9 @@ String request_inputs_data(String slave_address, int transmit_pin){
 
 void write_to_master(String string, int transmit_pin){
   digitalWrite(transmit_pin, HIGH);
-  delay(10);
+  delay(1);
   Serial2.println(string);
-  delay(55);
+  delay(100);
   digitalWrite(transmit_pin, LOW);
 }
 

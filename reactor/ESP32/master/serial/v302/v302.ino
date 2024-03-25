@@ -1,12 +1,12 @@
 #include <Arduino.h>
-#include "MCP_ADC.h"
+//#include "MCP_ADC.h"
 #include "QuickPID.h"
 #include "bioprocess.h"
 #include "comms_handle.h"
 
 #define N_OUTPUTS 6
-#define N_INPUTS  8
-#define N_SLAVES  1
+#define N_INPUTS  9
+#define N_SLAVES  0
 
 // MAX485 PINS
 int transmit_pin = 4;
@@ -14,7 +14,7 @@ String ADDRESS = "M0";
 boolean new_command = false;
 
 // Config Data
-String slaves[N_SLAVES] = {"S2"};
+String slaves[N_SLAVES];
 
 Output outputs[N_OUTPUTS] =
   {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
@@ -22,13 +22,14 @@ Output outputs[N_OUTPUTS] =
    {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 15, MANUAL, 0}};
 
 Input inputs[N_INPUTS] =
-  {{ADDRESS, "analog", 0, "current", 0}, {ADDRESS, "analog", 1, "dissolved_oxygen", 0},
-   {ADDRESS, "analog", 2, "ph", 0}, {ADDRESS, "analog", 3, "temperature_0", 0},
-   {ADDRESS, "analog", 4, "temperature_1", 0}, {ADDRESS, "analog", 5, "temperature_2", 0},
-   {ADDRESS, "analog", 6, "temperature_3", 0}, {ADDRESS, "analog", 7, "temperature_4", 0}};
+  {{ADDRESS, "adc", 0, "current", 0}, {ADDRESS, "adc", 1, "dissolved_oxygen", 0},
+   {ADDRESS, "adc", 2, "ph", 0}, {ADDRESS, "adc", 3, "temperature_0", 0},
+   {ADDRESS, "adc", 4, "temperature_1", 0}, {ADDRESS, "adc", 5, "temperature_2", 0},
+   {ADDRESS, "adc", 6, "temperature_3", 0}, {ADDRESS, "adc", 7, "temperature_4", 0},
+   {ADDRESS, "i2c", 8, "humidity", 0}};
 
 // Measurment Variables
-double analog[] = {0, 0, 0, 0, 0, 0, 0, 0}; // This is an accumulator variable for analog inputs
+double analog[N_INPUTS]; // This is an accumulator variable for analog inputs
 boolean READING = false;
 double sample_number;
 unsigned long int samples_per_second = 4;
@@ -48,30 +49,62 @@ QuickPID PID_4(&pid_filter[4], &pid_output[4], &pid_setpoint[4]);
 QuickPID PID_5(&pid_filter[5], &pid_output[5], &pid_setpoint[5]);
 QuickPID all_pids[N_OUTPUTS] = {PID_0, PID_1, PID_2, PID_3, PID_4, PID_5};
 
-// MCP Object
-MCP3208 ADC0(SPI_DOUT, SPI_DIN, SPI_CLK);
+// SPI and I2C sensors
+Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
 
-// Timer Callback function
+// Timer for data reading
 esp_timer_create_args_t create_args;
 esp_timer_handle_t timer_handle;
+unsigned long start_millis;
 void read_data(void *p) {
   READING = true;
+  start_millis = millis();
+}
+
+// Parallel tasks for communication
+TaskHandle_t comms_task;
+void comms_task_code(void * pvParameters){
+  for(;;){
+    if(READING){
+      delay(10);
+      send_data();
+    }
+    String input_string = parse_serial_master();
+    parse_string(input_string);
+  }
 }
 
 void setup() {
+  // Communications Setup
   Serial.begin(230400);
   Serial2.begin(9600, SERIAL_8N1, Rx, Tx);
   pinMode(transmit_pin, OUTPUT);
   digitalWrite(transmit_pin, LOW);
+  xTaskCreatePinnedToCore(comms_task_code, "comms_task", 10000, NULL, 0, &comms_task, 0);
 
-  // MCP3208 instance
-  ADC0.begin(CS0);
-  ADC0.setSPIspeed(1000000);
+  // Sensors instance - Inputs Setup
+  sensors.begin(CS0);
+  sensors.set_spi_speed(1000000);
+  Wire.begin();
 
-  // PWM Setup
+  inputs[0].read = &Sensors::read_adc;
+  inputs[1].read = &Sensors::read_adc;
+  inputs[2].read = &Sensors::read_adc;
+  inputs[3].read = &Sensors::read_adc;
+  inputs[4].read = &Sensors::read_adc;
+  inputs[5].read = &Sensors::read_adc;
+  inputs[6].read = &Sensors::read_adc;
+  inputs[7].read = &Sensors::read_adc;
+  inputs[8].read = &Sensors::read_sen0546_temperature;
+
+  for(int i=0; i<N_INPUTS; i++){
+    set_input_mssg_bp(&inputs[i]);
+  }
+
+  // Outputs Setup
   samples_per_second = 4;
   sample_time = set_sample_time(samples_per_second);
-  
+
   for(int i=0; i<N_OUTPUTS; i++){
     set_output_mssg_bp(&outputs[i]);
     if(outputs[i].type == "pwm"){
@@ -86,10 +119,7 @@ void setup() {
     all_pids[i].SetAntiWindupMode(all_pids[i].iAwMode::iAwClamp);
   }
 
-  for(int i=0; i<N_INPUTS; i++){
-    set_input_mssg_bp(&inputs[i]);
-  }
-
+  // Initialize measurments
   moving_average();
   get_moving_average();
   inputs[0].value = get_current(analog[0]);
@@ -103,10 +133,7 @@ void setup() {
   reset_moving_average();
   delay(100);
 
-//      MANUAL: "ADDR 1,0,OUT_CHANNEL,PWM,!"
-//      TIMER:  "ADDR 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
-//      PID:    "ADDR 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
-//      ONOFF:  "ADDR 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
+  // Set initial configuration
   String input_string = "M0 1,2,3,4,51.5,!";
   new_command = true;
   parse_string(input_string);
@@ -123,6 +150,7 @@ void loop() {
   }
 
   if(READING){
+    // Transform data
     get_moving_average();
     inputs[0].value = get_current(analog[0]);
     inputs[1].value = get_dissolved_oxygen(analog[1]);
@@ -132,23 +160,22 @@ void loop() {
     inputs[5].value = get_temperature(analog[5]);
     inputs[6].value = get_temperature(analog[6]);
     inputs[7].value = get_temperature(analog[7]);
-    set_output_vals();
-    send_data();
+    inputs[8].value = analog[8];
 
-    // Restart Timer
+    // Update outputs 
+    set_output_vals();
+
+    // Reset timer
     reset_moving_average();
     esp_timer_start_once(timer_handle, sample_time);
     READING = false;
   }
-
-  String input_string = parse_serial_master();
-  parse_string(input_string);
 }
 
 
 void moving_average(void){
-  for (int i = 0; i < ADC0.channels(); i++) {
-    analog[i] += ADC0.analogRead(i);
+  for (int i = 0; i < N_INPUTS; i++) {
+    analog[i] += (sensors.*inputs[i].read)(i);
   }
   sample_number += 1;
 }
@@ -156,14 +183,14 @@ void moving_average(void){
 
 void get_moving_average(void){
   float ref_voltage = 3.3;
-  for (int i = 0; i < ADC0.channels(); i++) {
-    analog[i] = (analog[i] / sample_number) * (ref_voltage / 4095);
+  for (int i = 0; i < N_INPUTS; i++) {
+    analog[i] = (analog[i] / sample_number);
   }
 }
 
 
 void reset_moving_average(void){
-  for (int i = 0; i < ADC0.channels(); i++) {
+  for (int i = 0; i < N_INPUTS; i++) {
     analog[i] = 0;
   }
   sample_number = 0;
@@ -230,7 +257,7 @@ void send_data(void){
 
 
 String write_outputs_string(void){
-  
+
   String outputs_string = "'outs':{'" + ADDRESS + "':[";
   for(int i=0; i < N_OUTPUTS; i++){
     outputs_string = outputs_string + get_output_data(outputs[i]);
@@ -245,7 +272,7 @@ String write_outputs_string(void){
       slaves_output_data = slaves_output_data + "],";
     }
   }
-  
+
   outputs_string = outputs_string + slaves_output_data;
   outputs_string = outputs_string + "}";
 
@@ -253,7 +280,7 @@ String write_outputs_string(void){
 }
 
 String write_inputs_string(void){
-  
+
   String inputs_string = "'ins':{'" + ADDRESS + "':[";
   for(int i=0; i < N_INPUTS; i++){
     inputs_string = inputs_string + get_input_data(inputs[i]);
@@ -282,12 +309,9 @@ void send_board_info(void){
   unsigned long start_time = millis();
   for(int i=0; i<N_SLAVES; i++){
     slaves_output_info = slaves_output_info + request_outputs_info(slaves[i], transmit_pin);
-    Serial.println(millis()-start_time);
     slaves_input_info = slaves_input_info + request_inputs_info(slaves[i], transmit_pin);
-    Serial.println(millis()-start_time);
   }
-  Serial.println(millis()-start_time);
-  
+
   String outputs_string = "'outputs': [";
   for(int i=0; i < N_OUTPUTS; i++){
     outputs_string = outputs_string + get_output_info(outputs[i]);
