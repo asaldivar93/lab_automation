@@ -58,7 +58,7 @@ class Output():
     def __init__(self, address: str, type: str,
                  channel: float):
         self.address = address
-        self.id = address + type + "_" + str(channel)
+        self.id = "_".join([address, str(channel)])
         self.type = type
         self.channel = channel
         self.bounds = valid_output_types[type]
@@ -68,10 +68,11 @@ class Output():
 
 
 class Input():
-    def __init__(self, address: str, type: str, channel: float, id: str):
+    def __init__(self, address: str, type: str, channel: float, variable: str):
         validate_input_type(type)
         self.address = address
-        self.id = id
+        self.id = "_".join([address, str(channel)])
+        self.variable = variable
         self.type = type
         self.channel = channel
 

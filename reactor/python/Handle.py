@@ -116,7 +116,7 @@ class Experiment():
             [(output.id, "INT") for output in self.board.Outputs]
         )
         columns_list.extend(
-            [(input.id, "REAL") for input in self.board.Inputs]
+            [(input.variable, "REAL") for input in self.board.Inputs]
         )
         return columns_list
 
@@ -139,16 +139,32 @@ class Experiment():
         table_name = self.name
         time = time.isoformat(sep=" ", timespec="milliseconds")
 
-        columns = ["date"]
+        ids = ["date"]
         values = [f"'{time}'"]
 
-        columns.extend(["_".join([type, str(channel)]) for type, channel, value in data_dict["outputs"]])
-        values.extend([str(value) for type, channel, value in data_dict["outputs"]])
+        address_list = data_dict["outs"].keys()
+        for address in address_list:
+            channels_list = data_dict["outs"][address]
+            ids_to_add = list()
+            values_to_add = list()
+            for channel, val in channels_list:
+                ids_to_add.append("_".join([address, str(channel)]))
+                values_to_add.append(str(val))
+            ids.extend(ids_to_add)
+            values.extend(values_to_add)
 
-        columns.extend([id for id, value in data_dict["inputs"]])
-        values.extend([str(value) for id, value in data_dict["inputs"]])
+        address_list = data_dict["ins"].keys()
+        for address in address_list:
+            channels_list = data_dict["ins"][address]
+            ids_to_add = list()
+            values_to_add = list()
+            for channel, val in channels_list:
+                variable = self.board.get_by_id("_".join([address, str(channel)])).variable
+                ids_to_add.append(variable)
+                values_to_add.append(str(val))
+            ids.extend(ids_to_add)
+            values.extend(values_to_add)
 
-        columns_str = ", ".join(columns)
+        columns_str = ", ".join(ids)
         values_str = ", ".join(values)
-
         self.sqlite_db.insert_row(table_name, columns_str, values_str)
