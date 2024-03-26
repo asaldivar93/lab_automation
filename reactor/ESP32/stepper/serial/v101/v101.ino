@@ -150,6 +150,7 @@ void parseString(String input_string){
 
       if(command == GET_OUTPUTS_INFO){
         send_outputs_info(outputs, transmit_pin);
+        //write_to_master("this!", transmit_pin);
       }
 
       if(command == GET_OUTPUTS_DATA){

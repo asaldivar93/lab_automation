@@ -68,15 +68,18 @@ void Sensors::set_ref_voltage(double ref_voltage){
   _ref_voltage = ref_voltage;
 }
 
-void Sensors::set_spi_speed(uint32_t speed)
-{
+void Sensors::set_spi_speed(uint32_t speed){
   _SPIspeed = speed;
   _spi_settings = SPISettings(_SPIspeed, MSBFIRST, SPI_MODE0);
 }
 
+void Sensors::set_mprls_range(double p_min, double p_max){
+  _p_min = p_min;
+  _p_max = p_max;
+}
 
-double Sensors::read_adc(uint8_t channel)
-{
+
+double Sensors::read_adc(uint8_t channel){
   if (channel >= _channels) return 0;
 
   uint8_t  data[3] = { 0,0,0 };
@@ -92,8 +95,7 @@ double Sensors::read_adc(uint8_t channel)
 }
 
 
-uint8_t Sensors::_swSPI_transfer(uint8_t val)
-{
+uint8_t Sensors::_swSPI_transfer(uint8_t val){
   uint8_t clk = _clock;
   uint8_t dao = _dataOut;
   uint8_t dai = _dataIn;
@@ -110,8 +112,7 @@ uint8_t Sensors::_swSPI_transfer(uint8_t val)
 }
 
 
-uint8_t Sensors::_build_request_mcp3208(uint8_t channel, uint8_t * data)
-{
+uint8_t Sensors::_build_request_mcp3208(uint8_t channel, uint8_t * data){
   //  P21  fig 6.1   MCP3204/3208
   data[0] = 0x04;  //  start bit
   data[0] |= 0x02; //  single read

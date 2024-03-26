@@ -15,7 +15,6 @@ import pandas as pd
 EXPERIMENTS_DATABASE_PATH = "experiments_db.tsv"
 inputs_columns_list = [("board", "TEXT"), ("experiment", "TEXT"),
                        ("type", "TEXT"), ("channel", "INT"), ("id", "TEXT")]
-datetime_iso = "%Y-%m-%d %H:%M:%-S"
 
 
 class Database():
@@ -103,7 +102,7 @@ class Experiment():
         table_name = "inputs"
         columns = "board, experiment, type, channel, id"
         for input in self.board.Inputs:
-            values = f"'{self.board.address}', '{self.name}', 'input.type', {input.channel}, '{input.id}'"
+            values = f"'{input.address}', '{self.name}', '{input.type}', {input.channel}, '{input.id}'"
             self.sqlite_db.insert_row(table_name, columns, values)
 
     def create_experiment_table(self):

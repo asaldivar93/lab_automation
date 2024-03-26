@@ -30,8 +30,8 @@ valid_commands = {
     "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1,
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
-valid_input_types = ["analog", "i2c", "spi", "pulses", "flow"]
-valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "speed": range(0, 1000)}
+valid_input_types = ["adc", "i2c", "spi", "pulses", "flow"]
+valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "stepper": range(0, 1000)}
 
 
 class Dictlist(list):
@@ -56,12 +56,11 @@ class config_handler(FileSystemEventHandler):
 
 class Output():
     def __init__(self, address: str, type: str,
-                 channel: float, control_mode: float):
+                 channel: float):
         self.address = address
         self.id = address + type + "_" + str(channel)
         self.type = type
         self.channel = channel
-        self.control_mode = control_mode
         self.bounds = valid_output_types[type]
 
     def __repr__(self):
@@ -69,8 +68,9 @@ class Output():
 
 
 class Input():
-    def __init__(self, type: str, channel: float, id: str):
+    def __init__(self, address: str, type: str, channel: float, id: str):
         validate_input_type(type)
+        self.address = address
         self.id = id
         self.type = type
         self.channel = channel
@@ -115,8 +115,11 @@ class Board():
 
     def set_outputs(self, board_info):
         outputs_list = []
-        for address, type, channel, mode in board_info["outputs"]:
-            outputs_list.extend([Output(address, type, channel, mode)])
+        address_list = board_info["outs"].keys()
+        for address in address_list:
+            channels_list = board_info["outs"][address]
+            for type, channel in channels_list:
+                outputs_list.extend([Output(address, type, channel)])
         self.Outputs = Dictlist(outputs_list)
 
         print(f"\n{len(self.Outputs)} output channels detected:")
@@ -125,9 +128,11 @@ class Board():
 
     def set_inputs(self, board_info):
         inputs_list = []
-        for type, channel, variable in board_info["inputs"]:
-            validate_input_type(type)
-            inputs_list.extend([Input(type, channel, variable)])
+        address_list = board_info["ins"].keys()
+        for address in address_list:
+            channels_list = board_info["ins"].keys()
+            for type, channel, variable in board_info["inputs"]:
+                inputs_list.extend([Input(address, type, channel, variable)])
         self.Inputs = Dictlist(inputs_list)
 
         print(f"\n{len(self.Inputs)} input channels detected:")

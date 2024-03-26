@@ -56,6 +56,7 @@ public:
 
   // MPRLS Pressure sensor
   double read_mprls(uint8_t channel);
+  void set_mprls_range(double p_min, double p_max);
 
 private:
   // MCP3208

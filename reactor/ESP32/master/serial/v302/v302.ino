@@ -6,7 +6,7 @@
 
 #define N_OUTPUTS 6
 #define N_INPUTS  9
-#define N_SLAVES  0
+#define N_SLAVES  1
 
 // MAX485 PINS
 int transmit_pin = 4;
@@ -14,7 +14,7 @@ String ADDRESS = "M0";
 boolean new_command = false;
 
 // Config Data
-String slaves[N_SLAVES];
+String slaves[N_SLAVES] = {"S2"};
 
 Output outputs[N_OUTPUTS] =
   {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
@@ -67,7 +67,7 @@ void comms_task_code(void * pvParameters){
   for(;;){
     if(READING){
       delay(10);
-      send_data();
+      //send_data();
     }
     String input_string = parse_serial_master();
     parse_string(input_string);
@@ -83,9 +83,11 @@ void setup() {
   xTaskCreatePinnedToCore(comms_task_code, "comms_task", 10000, NULL, 0, &comms_task, 0);
 
   // Sensors instance - Inputs Setup
+  Wire.begin();
   sensors.begin(CS0);
   sensors.set_spi_speed(1000000);
-  Wire.begin();
+  sensors.set_ref_voltage(3.3);
+  sensors.set_mprls_range(0, 25);
 
   inputs[0].read = &Sensors::read_adc;
   inputs[1].read = &Sensors::read_adc;
@@ -95,7 +97,7 @@ void setup() {
   inputs[5].read = &Sensors::read_adc;
   inputs[6].read = &Sensors::read_adc;
   inputs[7].read = &Sensors::read_adc;
-  inputs[8].read = &Sensors::read_sen0546_temperature;
+  inputs[8].read = &Sensors::read_mprls;
 
   for(int i=0; i<N_INPUTS; i++){
     set_input_mssg_bp(&inputs[i]);
@@ -306,30 +308,37 @@ void send_board_info(void){
   String slaves_output_info = "";
   String slaves_input_info = "";
 
-  unsigned long start_time = millis();
-  for(int i=0; i<N_SLAVES; i++){
+  for(int i=0; i<N_SLAVES; i++){    
+    slaves_output_info = slaves_output_info + "'" + slaves[i] + "':[";
     slaves_output_info = slaves_output_info + request_outputs_info(slaves[i], transmit_pin);
-    slaves_input_info = slaves_input_info + request_inputs_info(slaves[i], transmit_pin);
+    slaves_output_info = slaves_output_info + "],";
   }
 
-  String outputs_string = "'outputs': [";
+  delay(10);
+  for(int i=0; i<N_SLAVES; i++){
+    slaves_input_info = slaves_input_info + "'" + slaves[i] + "':[";
+    slaves_input_info = slaves_input_info + request_inputs_info(slaves[i], transmit_pin);
+    slaves_input_info = slaves_input_info + "],";
+  }
+
+  String outputs_string = "'outs':{'" + ADDRESS + "':[";
   for(int i=0; i < N_OUTPUTS; i++){
     outputs_string = outputs_string + get_output_info(outputs[i]);
   }
-  outputs_string = outputs_string + slaves_output_info;
-  outputs_string = outputs_string + "]";
+  outputs_string = outputs_string + "],";
+  outputs_string = outputs_string + slaves_output_info + "}";
 
-  String inputs_json = "'inputs': [";
+  String inputs_string = "'ins':{'" + ADDRESS + "':[";
   for(int i=0; i < N_INPUTS; i++){
-    inputs_json = inputs_json + get_input_info(inputs[i]);
+    inputs_string = inputs_string + get_input_info(inputs[i]);
   }
-  inputs_json = inputs_json + slaves_input_info;
-  inputs_json = inputs_json + "]";
+  inputs_string = inputs_string + "],";
+  inputs_string = inputs_string + slaves_input_info + "}";
 
   String all_data_json = "{'address': '" + ADDRESS + "', 'samples_per_second': " + samples_per_second + ", ";
-  all_data_json = all_data_json + outputs_string + ", " + inputs_json + "}115,!";
+  all_data_json = all_data_json + outputs_string + ", " + inputs_string;
+  all_data_json = all_data_json + "}115,!";
   Serial.println(all_data_json);
-  Serial.println(millis()-start_time);
 }
 
 
@@ -365,14 +374,6 @@ void parse_string(String input_string){
 //      GET_BOARD_INFO: "ADDR 0,!"
         send_board_info();
       }
-
-//      if(command == UPDATE_SAMPLES_PER_SECONDS){
-////      GET_BOARD_INFO: "ADDR 2,SAMPLES_PER_SECOND,!"
-//        lastcomma = firstcomma;
-//        nextcomma = input_string.indexOf(',', lastcomma + 1);
-//        uint32_t samples_per_second = input_string.substring(lastcomma + 1, nextcomma).toInt();
-//        sample_time = set_sample_time(samples_per_second)
-//      }
 
       if(command == TOGGLE_CONTROL_MODE){
 //      MANUAL: "ADDR, 1,0,OUT_CHANNEL,PWM,!"

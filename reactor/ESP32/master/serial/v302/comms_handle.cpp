@@ -42,16 +42,16 @@ String request_inputs_data(String slave_address, int transmit_pin){
 
 void write_to_master(String string, int transmit_pin){
   digitalWrite(transmit_pin, HIGH);
-  delay(1);
-  Serial2.println(string);
-  delay(100);
+  delay(10);
+  Serial2.print(string);
+  delay(50);
   digitalWrite(transmit_pin, LOW);
 }
 
 
 void write_to_slaves(String string, int transmit_pin){
   digitalWrite(transmit_pin, HIGH);
-  Serial2.println(string);
+  Serial2.print(string);
   delay(20);
   digitalWrite(transmit_pin, LOW);
 }
@@ -69,7 +69,7 @@ String parse_serial2(void){
       if(inChar != '!'){
         slave_string += inChar;
       }
-      else if(inChar == '!'){
+      if(inChar == '!'){
         waiting = false;
         break;
       }
@@ -80,18 +80,14 @@ String parse_serial2(void){
 
 String get_output_info(Output output_channel){
   String output_string = "(";
-  output_string = output_string + "'" + output_channel.address + "',";
   output_string = output_string + "'" + output_channel.type + "',";
-  output_string = output_string + output_channel.channel + ",";
-  output_string = output_string + output_channel.control_mode;
-  output_string = output_string + "),";
+  output_string = output_string + output_channel.channel + "),";
   return output_string;
 }
 
 
 String get_input_info(Input input_channel){
   String input_string = "(";
-  input_string = input_string + "'" + input_channel.address + "',";
   input_string = input_string + "'" + input_channel.type + "',";
   input_string = input_string + input_channel.channel + ",";
   input_string = input_string + "'" + input_channel.variable + "'";
