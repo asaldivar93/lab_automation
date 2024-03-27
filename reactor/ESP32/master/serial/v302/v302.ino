@@ -5,13 +5,19 @@
 #include "comms_handle.h"
 
 #define N_OUTPUTS 6
-#define N_INPUTS  9
+#define N_INPUTS  8
+#define N_PULSES  1
 #define N_SLAVES  1
 
-// MAX485 PINS
-int transmit_pin = 4;
+// Serial info
 String ADDRESS = "M0";
+int transmit_pin = 4;
 boolean new_command = false;
+
+// Seriaf buffers
+String outputs_buffer = "";
+String inputs_buffer = "";
+String pulses_buffer = "";
 
 // Config Data
 String slaves[N_SLAVES] = {"S2"};
@@ -19,21 +25,24 @@ String slaves[N_SLAVES] = {"S2"};
 Output outputs[N_OUTPUTS] =
   {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
    {ADDRESS, "pwm", 2, 14, MANUAL, 0}, {ADDRESS, "pwm", 3, 27, MANUAL, 0},
-   {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 15, MANUAL, 0}};
+   {ADDRESS, "pwm", 4, 26, MANUAL, 0}};
 
 Input inputs[N_INPUTS] =
-  {{ADDRESS, "adc", 0, "current", 0}, {ADDRESS, "adc", 1, "dissolved_oxygen", 0},
-   {ADDRESS, "adc", 2, "ph", 0}, {ADDRESS, "adc", 3, "temperature_0", 0},
-   {ADDRESS, "adc", 4, "temperature_1", 0}, {ADDRESS, "adc", 5, "temperature_2", 0},
-   {ADDRESS, "adc", 6, "temperature_3", 0}, {ADDRESS, "adc", 7, "temperature_4", 0},
-   {ADDRESS, "i2c", 8, "humidity", 0}};
+  {{ADDRESS, "adc", 0, "current"}, {ADDRESS, "adc", 1, "dissolved_oxygen"},
+   {ADDRESS, "adc", 2, "ph"}, {ADDRESS, "adc", 3, "temperature_0"},
+   {ADDRESS, "adc", 4, "temperature_1"}, {ADDRESS, "adc", 5, "temperature_2"},
+   {ADDRESS, "adc", 6, "temperature_3"}, {ADDRESS, "adc", 7, "temperature_4"}};
+
+Input pulses[N_PULSES] = {{ADDRESS, "pulse", 8, "delta_pressure", 25}};
 
 // Measurment Variables
 double analog[N_INPUTS]; // This is an accumulator variable for analog inputs
-boolean READING = false;
+boolean DATA_READY = false;
+boolean PULSES_READY = false;
 double sample_number;
 unsigned long int samples_per_second = 4;
 unsigned long int sample_time;
+unsigned long int pulses_time = 60000000;
 
 // PID Channels
 float Kp = 100;
@@ -52,37 +61,40 @@ QuickPID all_pids[N_OUTPUTS] = {PID_0, PID_1, PID_2, PID_3, PID_4, PID_5};
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
 
-// Timer for data reading
-esp_timer_create_args_t create_args;
-esp_timer_handle_t timer_handle;
-unsigned long start_millis;
-void read_data(void *p) {
-  READING = true;
-  start_millis = millis();
+// Timer for sensors reading
+esp_timer_create_args_t timer_sensor_args;
+esp_timer_handle_t timer_sensors_handle;
+void flag_data_ready(void *p) {
+  DATA_READY = true;
 }
 
-// Parallel tasks for communication
-TaskHandle_t comms_task;
-void comms_task_code(void * pvParameters){
+// Timer for pulse counter
+esp_timer_create_args_t timer_pulses_args;
+esp_timer_handle_t timer_pulses_handle;
+void flag_pulses_ready(void *p) {
+  PULSES_READY = true;
+}
+
+TaskHandle_t serial_comms;
+
+// Parallel task for communication
+void serial_comms_code(void *parameters){
   for(;;){
-    if(READING){
-      delay(10);
-      //send_data();
-    }
     String input_string = parse_serial_master();
     parse_string(input_string);
   }
 }
 
-void setup() {
+void setup(){
   // Communications Setup
   Serial.begin(230400);
   Serial2.begin(9600, SERIAL_8N1, Rx, Tx);
   pinMode(transmit_pin, OUTPUT);
   digitalWrite(transmit_pin, LOW);
-  xTaskCreatePinnedToCore(comms_task_code, "comms_task", 10000, NULL, 0, &comms_task, 0);
+  xTaskCreatePinnedToCore(serial_comms_code, "serial_comms", 10000, NULL, 0, &serial_comms, 0);
 
   // Sensors instance - Inputs Setup
+  //xTaskCreatePinnedToCore(read_sensors_code, "read_sensors", 10000, NULL, 1, &read_sensors, 1);
   Wire.begin();
   sensors.begin(CS0);
   sensors.set_spi_speed(1000000);
@@ -97,14 +109,20 @@ void setup() {
   inputs[5].read = &Sensors::read_adc;
   inputs[6].read = &Sensors::read_adc;
   inputs[7].read = &Sensors::read_adc;
-  inputs[8].read = &Sensors::read_mprls;
+
+  pulses[0].read = &Sensors::read_mprls;
 
   for(int i=0; i<N_INPUTS; i++){
     set_input_mssg_bp(&inputs[i]);
   }
 
+  for(int i=0; i<N_PULSES; i++){
+    set_input_mssg_bp(&pulses[i]);
+    ledcSetup(pulses[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
+    ledcAttachPin(pulses[i].pin, pulses[i].channel);
+  }
+
   // Outputs Setup
-  samples_per_second = 4;
   sample_time = set_sample_time(samples_per_second);
 
   for(int i=0; i<N_OUTPUTS; i++){
@@ -135,23 +153,26 @@ void setup() {
   reset_moving_average();
   delay(100);
 
-  // Set initial configuration
+  // Set default configuration
   String input_string = "M0 1,2,3,4,51.5,!";
   new_command = true;
   parse_string(input_string);
 
-  // Start Timer
-  create_args.callback = read_data; // Set esp-timer argument
-  esp_timer_create(&create_args, &timer_handle);
-  esp_timer_start_once(timer_handle, sample_time);
+  // Initialize timers for sensors and pulses;
+  timer_sensor_args.callback = flag_data_ready;
+  esp_timer_create(&timer_sensor_args, &timer_sensors_handle);
+
+  timer_pulses_args.callback = flag_pulses_ready;
+  esp_timer_create(&timer_pulses_args, &timer_pulses_handle);
+
+  esp_timer_start_once(timer_sensors_handle, sample_time);
+  esp_timer_start_once(timer_pulses_handle, pulses_time);
 }
 
 void loop() {
-  if(!READING){
-    moving_average();
-  }
-
-  if(READING){
+  moving_average();
+  pulse_counter();
+  if(DATA_READY){
     // Transform data
     get_moving_average();
     inputs[0].value = get_current(analog[0]);
@@ -162,26 +183,33 @@ void loop() {
     inputs[5].value = get_temperature(analog[5]);
     inputs[6].value = get_temperature(analog[6]);
     inputs[7].value = get_temperature(analog[7]);
-    inputs[8].value = analog[8];
 
-    // Update outputs 
+    // Update outputs
     set_output_vals();
+    update_inputs_buffer(&inputs_buffer);
+    update_outputs_buffer(&outputs_buffer);
 
     // Reset timer
     reset_moving_average();
-    esp_timer_start_once(timer_handle, sample_time);
-    READING = false;
+    esp_timer_start_once(timer_sensors_handle, sample_time);
+    DATA_READY = false;
+  }
+
+  if(PULSES_READY){
+    reset_pulse_counters();
+    update_pulses_buffer(&pulses_buffer);
+    esp_timer_start_once(timer_pulses_handle, pulses_time);
+    PULSES_READY = false;
   }
 }
-
 
 void moving_average(void){
   for (int i = 0; i < N_INPUTS; i++) {
-    analog[i] += (sensors.*inputs[i].read)(i);
+    int channel = inputs[i].channel;
+    analog[i] += (sensors.*inputs[i].read)(channel);
   }
   sample_number += 1;
 }
-
 
 void get_moving_average(void){
   float ref_voltage = 3.3;
@@ -190,7 +218,6 @@ void get_moving_average(void){
   }
 }
 
-
 void reset_moving_average(void){
   for (int i = 0; i < N_INPUTS; i++) {
     analog[i] = 0;
@@ -198,6 +225,36 @@ void reset_moving_average(void){
   sample_number = 0;
 }
 
+void pulse_counter(void){
+  /*
+  This pulses_counter is used to measure gas flow using the difference between p_final and p_initial.
+
+  A pulse cycle goes from p_last (p_initial) to PULSES_PRESSURE_UB. When the pressure goes above the UB,
+  the difference between the current pressure (p_final) and p_last is added to the delta pressure
+  accumulator (pulse[i].delta_pressure), then a solenoid is activated to reset the pressure,
+  and p_last is updated
+
+  A measurment cycle last 60 seconds by default. The reported value is the accumulated delt_pressure
+  after the 60s have elapsed
+  */
+  for(int i=0; i<N_PULSES; i++){
+    double pressure = (sensors.*pulses[i].read)(i);
+    if(pressure >= PULSES_PRESSURE_UB){
+      pulses[i].delta_pressure += pressure - pulses[i].last_pressure;
+      ledcWrite(pulses[i].channel, 255);
+      delay(5);
+      pulses[i].last_pressure = (sensors.*pulses[i].read)(i);
+      ledcWrite(pulses[i].channel, 0);
+    }
+  }
+}
+
+void reset_pulse_counters(void){
+  for(int i=0; i<N_PULSES; i++){
+    pulses[i].value = pulses[i].delta_pressure;
+    pulses[i].delta_pressure = 0;
+  }
+}
 
 void set_output_vals(void){
   for(int i=0; i<N_OUTPUTS; i++){
@@ -246,26 +303,38 @@ void set_output_vals(void){
   }
 }
 
-
-void send_data(void){
-  String outputs_json = write_outputs_string();
-  String inputs_json = write_inputs_string();
+void send_data(String *outputsBuffer, String *inputsBuffer, String *pulsesBuffer){
+  /*
+  Gathers all sensor readings and outputs values and prints them to Serial in a dictionary string with structure:
+  {"outs": {"master": [outs],
+            "slave1": [outs], ... "slaveN": [outs]},
+   "ins": {"master": [ins],
+           "slave1": [ins], ... "slaveN": [ins]}
+  }
+  */
+  String outputs_string = write_outputs_string(outputsBuffer);
+  String inputs_string = write_inputs_string(inputsBuffer, pulsesBuffer);
 
   String all_data_json = "{";
-  all_data_json = all_data_json + outputs_json + "," + inputs_json;
+  all_data_json = all_data_json + outputs_string + "," + inputs_string;
   all_data_json = all_data_json + "}100,!";
   Serial.println(all_data_json);
+
+  // Clear all buffers to keep most recent readings only
+  *outputsBuffer = "";
+  *inputsBuffer = "";
+  *pulsesBuffer = "";
 }
 
-
-String write_outputs_string(void){
-
-  String outputs_string = "'outs':{'" + ADDRESS + "':[";
-  for(int i=0; i < N_OUTPUTS; i++){
-    outputs_string = outputs_string + get_output_data(outputs[i]);
-  }
-  outputs_string = outputs_string + "],";
-
+String write_outputs_string(String *outputsBuffer){
+  /*
+  Requests outputs data from slaves and joins it with outputs data from self
+  Inputs:
+    *outputsBuffer: a pointer to the outputs_buffer string
+  Outputs:
+    ouputs_string: a dictionary entry string with structure:
+      "outs": {"master": [outs], "slave1": [outs], ... "slaveN": [outs]}
+  */
   String slaves_output_data = "";
   if(N_SLAVES>0){
     for(int i=0; i < N_SLAVES; i++){
@@ -275,19 +344,23 @@ String write_outputs_string(void){
     }
   }
 
+  String outputs_string = "'outs':{'" + ADDRESS + "':[" + *outputsBuffer + "],";
   outputs_string = outputs_string + slaves_output_data;
   outputs_string = outputs_string + "}";
-
   return outputs_string;
 }
 
-String write_inputs_string(void){
-
-  String inputs_string = "'ins':{'" + ADDRESS + "':[";
-  for(int i=0; i < N_INPUTS; i++){
-    inputs_string = inputs_string + get_input_data(inputs[i]);
-  }
-  inputs_string = inputs_string + "],";
+String write_inputs_string(String *inputsBuffer, String *pulsesBuffer){
+  /*
+  Requests inputs data from slaves and joins it with inputs data from self
+  Inputs:
+    *inputsBuffer: a pointer to the outputs_buffer string
+    *pulsesBuffer: a pointer to the pulses_buffer string
+  Outputs:
+    inputs_string: a dictionary entry string with structure
+     "ins": {"master": [ins], "slave1": [ins], ... "slaveN": [ins]}
+  */
+  String inputs_string = "'ins':{'" + ADDRESS + "':[" + *inputsBuffer + *pulsesBuffer + "],";
 
   String slaves_input_data = "";
   if(N_SLAVES>0){
@@ -303,12 +376,46 @@ String write_inputs_string(void){
   return inputs_string;
 }
 
+void update_outputs_buffer(String *outputsBuffer){
+  /*
+  Takes outputs_buffer string from the global variables and updates
+  the string every time new sensor readings are available
+
+  Inputs:
+    *outputsBuffer: a pointer to the outputs_buffer string
+  */
+  *outputsBuffer = ""; // Clear Buffer to keep only most recent readings
+  for(int i=0; i < N_OUTPUTS; i++){
+    *outputsBuffer = *outputsBuffer + get_output_data(outputs[i]);
+  }
+}
+
+void update_inputs_buffer(String *inputsBuffer){
+  /*
+  Takes inputs_buffer string from the global variables and updates
+  the string every time new sensor readings are available
+
+  Inputs:
+    *inputsBuffer: a pointer to the inputs_buffer string
+  */
+  *inputsBuffer = ""; // Clear Buffer to keep only most recent readings
+  for(int i=0; i < N_INPUTS; i++){
+    *inputsBuffer = *inputsBuffer + get_input_data(inputs[i]);
+  }
+}
+
+void update_pulses_buffer(String *pulsesBuffer){
+  *pulsesBuffer = "";
+  for(int i=0; i < N_PULSES; i++){
+    *pulsesBuffer = *pulsesBuffer + get_input_data(pulses[i]);
+  }
+}
 
 void send_board_info(void){
   String slaves_output_info = "";
   String slaves_input_info = "";
 
-  for(int i=0; i<N_SLAVES; i++){    
+  for(int i=0; i<N_SLAVES; i++){
     slaves_output_info = slaves_output_info + "'" + slaves[i] + "':[";
     slaves_output_info = slaves_output_info + request_outputs_info(slaves[i], transmit_pin);
     slaves_output_info = slaves_output_info + "],";
@@ -332,6 +439,9 @@ void send_board_info(void){
   for(int i=0; i < N_INPUTS; i++){
     inputs_string = inputs_string + get_input_info(inputs[i]);
   }
+  for(int i=0; i < N_PULSES; i++){
+    inputs_string = inputs_string + get_input_info(pulses[i]);
+  }
   inputs_string = inputs_string + "],";
   inputs_string = inputs_string + slaves_input_info + "}";
 
@@ -340,7 +450,6 @@ void send_board_info(void){
   all_data_json = all_data_json + "}115,!";
   Serial.println(all_data_json);
 }
-
 
 String parse_serial_master(void){
   String input_string = "";
@@ -354,7 +463,6 @@ String parse_serial_master(void){
   }
   return input_string;
 }
-
 
 void parse_string(String input_string){
   int firstcomma;
@@ -373,6 +481,10 @@ void parse_string(String input_string){
       if(command == GET_BOARD_INFO){
 //      GET_BOARD_INFO: "ADDR 0,!"
         send_board_info();
+      }
+
+      if(command == GET_REQUEST){
+        send_data(&outputs_buffer, &inputs_buffer, &pulses_buffer);
       }
 
       if(command == TOGGLE_CONTROL_MODE){

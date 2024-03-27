@@ -66,7 +66,7 @@ uint32_t sample_time;
 output outputs[N_OUTPUTS] =
   {{ADDRESS, "pwm", 0, 13, MANUAL, 0}, {ADDRESS, "pwm", 1, 12, MANUAL, 0},
    {ADDRESS, "pwm", 2, 14, MANUAL, 0}, {ADDRESS, "pwm", 3, 27, MANUAL, 0},
-   {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 15, MANUAL, 0}};
+   {ADDRESS, "pwm", 4, 26, MANUAL, 0}, {ADDRESS, "pwm", 5, 25, MANUAL, 0}};
 
 input inputs[N_INPUTS] =
   {{"analog", 0, "current", 0}, {"analog", 1, "dump", 0},

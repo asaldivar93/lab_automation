@@ -38,6 +38,8 @@ String get_output_data(Output output_channel);
 
 String get_input_data(Input input_channel);
 
+String get_pulse_data(Input pulse_channel);
+
 void set_output_mssg_bp(Output *output_channel);
 
 void set_input_mssg_bp(Input *input_channel);

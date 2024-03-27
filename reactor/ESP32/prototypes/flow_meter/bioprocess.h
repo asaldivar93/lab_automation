@@ -21,8 +21,6 @@
 #define LEDC_BIT 8
 #define LEDC_BASE_FREQ 800
 
-#define PULSES_PRESSURE_UB 11.4
-
 // I2C SENSORS
 #define MPRLS_DEFAULT_ADDRESS 0x18
 
@@ -125,10 +123,7 @@ typedef struct{
   String type;
   int channel;
   String variable;
-  int pin;
   double value;
-  double delta_pressure;
-  double last_pressure;
   String message_bp;
   Readfunc read;
 } Input;
@@ -150,4 +145,28 @@ double get_dissolved_oxygen(double voltage);
 double get_ph(double voltage);
 
 double get_temperature(double voltage);
+
+void moving_average(void);
+
+void get_moving_average(void);
+
+void reset_moving_average(void);
+
+void set_output_vals(void);
+
+void send_data(String *outputsBuffer, String *inputsBuffer, String *pulsesBuffer));
+
+String write_outputs_string(String *outputsBuffer);
+
+String write_inputs_string(String *inputsBuffer, String *pulsesBuffer);
+
+void update_outputs_buffer(String *outputsBuffer);
+
+void update_inputs_buffer(String *inputsBuffer);
+
+void send_board_info(void);
+
+String parse_serial_master(void);
+
+void parse_string(String input_string);
 #endif
