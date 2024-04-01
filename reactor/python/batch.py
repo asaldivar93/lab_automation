@@ -40,3 +40,4 @@ while True:
     except OSError as e:
         print(e)
         experiment.board.reconnect()
+        board.is_config_updated = True

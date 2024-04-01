@@ -4,7 +4,7 @@
 #include "bioprocess.h"
 #include "comms_handle.h"
 
-#define N_OUTPUTS 6
+#define N_OUTPUTS 5
 #define N_INPUTS  8
 #define N_PULSES  1
 #define N_SLAVES  1
@@ -55,8 +55,8 @@ QuickPID PID_1(&pid_filter[1], &pid_output[1], &pid_setpoint[1]);
 QuickPID PID_2(&pid_filter[2], &pid_output[2], &pid_setpoint[2]);
 QuickPID PID_3(&pid_filter[3], &pid_output[3], &pid_setpoint[3]);
 QuickPID PID_4(&pid_filter[4], &pid_output[4], &pid_setpoint[4]);
-QuickPID PID_5(&pid_filter[5], &pid_output[5], &pid_setpoint[5]);
-QuickPID all_pids[N_OUTPUTS] = {PID_0, PID_1, PID_2, PID_3, PID_4, PID_5};
+//QuickPID PID_5(&pid_filter[5], &pid_output[5], &pid_setpoint[5]);
+QuickPID all_pids[N_OUTPUTS] = {PID_0, PID_1, PID_2, PID_3, PID_4};
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);

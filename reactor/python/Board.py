@@ -5,7 +5,7 @@ Created on 2024 Feb 29 12:00
 
 @author: Alexis Saldivar
 """
-from typing import Callable
+from typing import Callable, NamedTuple
 
 import ast
 import json
@@ -30,8 +30,8 @@ valid_commands = {
     "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1,
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
-valid_input_types = ["adc", "i2c", "spi", "pulses", "flow"]
-valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "stepper": range(0, 1000)}
+valid_input_types = ["adc", "i2c", "spi", "pulse", "flow"]
+valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "stp": range(0, 1000)}
 
 
 class Dictlist(list):
@@ -55,23 +55,23 @@ class config_handler(FileSystemEventHandler):
 
 
 class Output():
-    def __init__(self, address: str, type: str,
-                 channel: float):
+    def __init__(self, address: str, type: str, channel: float):
         self.address = address
         self.id = "_".join([address, str(channel)])
         self.type = type
         self.channel = channel
         self.bounds = valid_output_types[type]
+        self.control_mode = manual_control(0, 0)
 
     def __repr__(self):
-        return f"Output(id={self.id}, channel={self.channel}, control_mode={self.control_mode})"
+        return f"Output(id={self.id}, channel={self.channel}, type={self.type})"
 
 
 class Input():
     def __init__(self, address: str, type: str, channel: float, variable: str):
         validate_input_type(type)
         self.address = address
-        self.id = "_".join([address, str(channel)])
+        self.id = variable
         self.variable = variable
         self.type = type
         self.channel = channel
@@ -81,7 +81,7 @@ class Input():
 
 
 class Board():
-    def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400):
+    def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400, config_dir: str = "configuration/"):
         self.address = address
 
         self.set_serial_port(port_name)
@@ -96,7 +96,7 @@ class Board():
         print("Connection successfull\n")
         logging.info("Connection successfull\n")
 
-        self.config_dir = "configuration/"
+        self.config_dir = config_dir
         self.read_config_json()
 
     def set_serial_port(self, port_name):
@@ -131,8 +131,8 @@ class Board():
         inputs_list = []
         address_list = board_info["ins"].keys()
         for address in address_list:
-            channels_list = board_info["ins"].keys()
-            for type, channel, variable in board_info["inputs"]:
+            channels_list = board_info["ins"][address]
+            for type, channel, variable in channels_list:
                 inputs_list.extend([Input(address, type, channel, variable)])
         self.Inputs = Dictlist(inputs_list)
 
@@ -178,6 +178,7 @@ class Board():
             command = "UPDATE_CONFIGURATION"
             args_queue = self.parse_config(self.config_dict)
             while args_queue:
+                print(args_queue[0])
                 address, args = args_queue[0]
                 self.write_command(address, command, args)
                 args_queue.pop(0)
@@ -226,68 +227,72 @@ class Board():
     def start_config_observer(self):
         self.config_observer = Observer()
         event_handler = config_handler(self.read_config_json)
-        self.config_observer.schedule(event_handler, path="configuration/", recursive=True)
+        self.config_observer.schedule(event_handler, path=self.config_dir, recursive=True)
         self.config_observer.start()
 
     def parse_config(self, config_dict):
         args_queue = []
         for channel_id in config_dict.keys():
             try:
-                output_i = self.Outputs.get_by_id(channel_id)
-                out_channel = output_i.channel
-                address = output_i.address
-                current_control = output_i.control_mode
+                output = self.Outputs.get_by_id(channel_id)
+                current_control = output.control_mode
             except KeyError:
                 logging.warning(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
             else:
                 match config_dict[channel_id]:
                     case {"mode": "MANUAL", "value": value}:
-                        control_mode = valid_control_modes["MANUAL"]
-                        if not control_mode == current_control:
-                            if isinstance(value, int):
-                                args_queue.append([address, [control_mode, out_channel, value]])
-                                output_i.control_mode = control_mode
-                            else:
-                                logging.warning(f"In {channel_id}, value must be of type(int)")
+                        if isinstance(value, int):
+                            new_control = manual_control(output.channel, value)
+                            if not new_control == current_control:
+                                args_queue.append([output.address, new_control.get_args()])
+                                output.control_mode = new_control
+                        else:
+                            logging.warning(f"In {channel_id}, value must be of type(int)")
 
                     case {"mode": "TIMER", "value": value, "time_on": time_on, "time_off": time_off}:
-                        control_mode = valid_control_modes["TIMER"]
-                        if not control_mode == current_control:
-                            if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
-                                time_on = time_on * self.samples_per_second
-                                time_off = time_off * self.samples_per_second
-                                args_queue.append([address, [control_mode, out_channel, time_on, time_off, value]])
-                                output_i.control_mode = control_mode
-                            else:
-                                logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
+                        if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
+                            time_on = time_on * self.samples_per_second
+                            time_off = time_off * self.samples_per_second
+                            new_control = timer_control(output.channel, time_on, time_off, value)
+                            if not new_control == current_control:
+                                args_queue.append([output.address, new_control.get_args()])
+                                output.control_mode = new_control
+                        else:
+                            logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
 
-                    case {"mode": "PID", "setpoint": setpoint, "variable": variable}:
-                        control_mode = valid_control_modes["PID"]
-                        if not control_mode == current_control:
+                    case {"mode": "PID", "variable": variable, "setpoint": setpoint}:
+                        if isinstance(setpoint, (float, int)):
                             try:
-                                in_channel = self.Inputs.get_by_id(variable).channel
+                                input = self.Inputs.get_by_id(variable)
                             except KeyError:
                                 logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
-                                if isinstance(setpoint, (float, int)):
-                                    args_queue.append([address, [control_mode, out_channel, in_channel, setpoint]])
-                                    output_i.control_mode = control_mode
-                                else:
-                                    logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
+                                new_control = pid_control(output.channel, input.channel, setpoint)
+                                if not new_control == current_control:
+                                    if output.address == input.address:
+                                        args_queue.append([output.address, new_control.get_args()])
+                                        output.control_mode = new_control
+                                    else:
+                                        logging.warning(f"In {channel_id}, control variable must be on same board as output channel")
+                        else:
+                            logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
 
-                    case {"mode": "ONOFF", "value": value, "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound}:
-                        control_mode = valid_control_modes["ONOFF"]
-                        if not control_mode == current_control:
+                    case {"mode": "ONOFF", "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound, "value": value}:
+                        if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
                             try:
-                                in_channel = self.Inputs.get_by_id(variable).channel
+                                input = self.Inputs.get_by_id(variable).channel
                             except KeyError:
                                 logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
-                                if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
-                                    args_queue.append([address, [control_mode, out_channel, in_channel, lower_bound, upper_bound, value]])
-                                    output_i.control_mode = control_mode
-                                else:
-                                    logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
+                                new_control = onoff_control(output.channel, input.channel, lower_bound, upper_bound, value)
+                                if not new_control == current_control:
+                                    if output.address == input.address:
+                                        args_queue.append([output.address, new_control.get_args()])
+                                        output.control_mode = new_control
+                                    else:
+                                        logging.warning(f"In {channel_id}, control variable must be on same board as output channel")
+                        else:
+                            logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
 
                     case {"mode": mode}:
                         logging.warning(f"{mode} mode must be on of {valid_control_modes}")
@@ -317,6 +322,48 @@ class Board():
         self.serial_port.flushOutput()
         logging.warning("Device Reconneted")
         time.sleep(0.5)
+
+
+class manual_control(NamedTuple):
+    control_type = valid_control_modes["MANUAL"]
+    channel: int
+    value: int
+
+    def get_args(self):
+        return [self.control_type, *self]
+
+
+class timer_control(NamedTuple):
+    control_type = valid_control_modes["TIMER"]
+    channel: int
+    time_on: int
+    time_off: int
+    value: int
+
+    def get_args(self):
+        return [self.control_type, *self]
+
+
+class pid_control(NamedTuple):
+    control_type = valid_control_modes["PID"]
+    channel: int
+    variable: int
+    setpoint: float
+
+    def get_args(self):
+        return [self.control_type, *self]
+
+
+class onoff_control(NamedTuple):
+    control_type = valid_control_modes["ONOFF"]
+    channel: int
+    variable: int
+    lower_bound: float
+    upper_bound: float
+    value: int
+
+    def get_args(self):
+        return [self.control_type, *self]
 
 
 def validate_serial_port(port_name):

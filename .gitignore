@@ -26,3 +26,4 @@ results/
 *.csv
 *.ipynb
 *.log
+*-backups/
