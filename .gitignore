@@ -24,6 +24,5 @@ results/
 *.db
 *.tsv
 *.csv
-*.ipynb
 *.log
 *-backups/
