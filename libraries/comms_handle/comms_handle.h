@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "bioprocess.h"
+#include "bioreactify.h"
 
 // commands
 #define GET_BOARD_INFO 0
@@ -21,17 +21,17 @@ String parse_serial_slave(bool *new_command);
 
 String parse_slave_to_master(void);
 
-String request_outputs_info(String slave_address, int transmit_pin);
+String request_outputs_info(String slaveAddress, int transmitPin);
 
-String request_outputs_data(String slave_address, int transmit_pin);
+String request_outputs_data(String slaveAddress, int transmitPin);
 
-String request_inputs_info(String slave_address, int transmit_pin);
+String request_inputs_info(String slaveAddress, int transmitPin);
 
-String request_inputs_data(String slave_address, int transmit_pin);
+String request_inputs_data(String slaveAddress, int transmitPin);
 
-void write_to_master(String string, int transmit_pin);
+void write_to_master(String string, int transmitPin);
 
-void write_to_slaves(String string, int transmit_pin);
+void write_to_slaves(String string, int transmitPin);
 
 String get_outputs_info(Output outputs[], int numberOfOutputs);
 

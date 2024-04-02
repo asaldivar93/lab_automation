@@ -171,7 +171,7 @@ double Sensors::read_mprls(uint8_t channel){
   }
 
   delay(6);
-  Wire.requestFrom(MPRLS_DEFAULT_ADDRESS, 7);
+  Wire.requestFrom(_MPRLS_DEFAULT_ADDRESS, 7);
   for(int i=0; i < 7; i++){
     _data[i] = Wire.read();
   }

@@ -1,8 +1,11 @@
 #include <Arduino.h>
 #include "comms_handle.h"
-#include "bioprocess.h"
+#include "bioreactify.h"
 
 String parse_serial_master(bool *new_command) {
+  /*
+  Reads Serial buffer
+  */
   String input_string = "";
   while (Serial.available()) {
     char inChar = char(Serial.read());
@@ -17,6 +20,9 @@ String parse_serial_master(bool *new_command) {
 
 
 String parse_serial_slave(bool *new_command){
+  /*
+  Reads Serial buffer
+  */
   String input_string = "";
   while(Serial2.available()){
     char inChar = char(Serial2.read());
@@ -29,62 +35,80 @@ String parse_serial_slave(bool *new_command){
   return input_string;
 }
 
-String request_outputs_info(String slave_address, int transmit_pin){
+String request_outputs_info(String slaveAddress, int transmitPin){
+  /*
+  Sends a request for outputs info to slaves and waits for a response
+  */
   String command = String(GET_OUTPUTS_INFO);
-  String command_string = slave_address + " " + command + ",!";
-  write_to_slaves(command_string, transmit_pin);
+  String command_string = slaveAddress + " " + command + ",!";
+  write_to_slaves(command_string, transmitPin);
 
   String output_info = parse_slave_to_master();
   return output_info;
 }
 
-String request_outputs_data(String slave_address, int transmit_pin){
+String request_outputs_data(String slaveAddress, int transmitPin){
+  /*
+  Sends a request for outputs data to slaves and waits for a response
+  */
   String command = String(GET_OUTPUTS_DATA);
-  String command_string = slave_address + " " + command + ",!";
-  write_to_slaves(command_string, transmit_pin);
+  String command_string = slaveAddress + " " + command + ",!";
+  write_to_slaves(command_string, transmitPin);
 
   String output_data = parse_slave_to_master();
   return output_data;
 }
 
-String request_inputs_info(String slave_address, int transmit_pin){
+String request_inputs_info(String slaveAddress, int transmitPin){
+  /*
+  Sends a request for inputs info to slaves and waits for a response
+  */
   String command = String(GET_INPUTS_INFO);
-  String command_string = slave_address + " " + command + ",!";
-  write_to_slaves(command_string, transmit_pin);
+  String command_string = slaveAddress + " " + command + ",!";
+  write_to_slaves(command_string, transmitPin);
 
   String input_info = parse_slave_to_master();
   return input_info;
 }
 
-String request_inputs_data(String slave_address, int transmit_pin){
+String request_inputs_data(String slaveAddress, int transmitPin){
+  /*
+  Sends a request for inputs data to slaves and waits for a response
+  */
   String command = String(GET_INPUTS_DATA);
-  String command_string = slave_address + " " + command + ",!";
-  write_to_slaves(command_string, transmit_pin);
+  String command_string = slaveAddress + " " + command + ",!";
+  write_to_slaves(command_string, transmitPin);
 
   String input_data = parse_slave_to_master();
   return input_data;
 }
 
 
-void write_to_master(String string, int transmit_pin){
-  digitalWrite(transmit_pin, HIGH);
+void write_to_master(String string, int transmitPin){
+  digitalWrite(transmitPin, HIGH);
   delay(10);
   Serial2.print(string);
-  delay(50);
-  digitalWrite(transmit_pin, LOW);
+  delay(120);
+  digitalWrite(transmitPin, LOW);
 }
 
 
-void write_to_slaves(String string, int transmit_pin){
-  digitalWrite(transmit_pin, HIGH);
+void write_to_slaves(String string, int transmitPin){
+  digitalWrite(transmitPin, HIGH);
   Serial2.print(string);
   delay(20);
-  digitalWrite(transmit_pin, LOW);
+  digitalWrite(transmitPin, LOW);
 }
 
 
 String parse_slave_to_master(void){
-  unsigned long wait_for = 90;
+  /*
+  THIS IS A BLOCKING FUNCTION
+
+  Waits for 90ms for an input from Slaves Serial Buffer (Serial2)
+  Reads Serial2 Buffer if available
+  */
+  unsigned long wait_for = 500;
   bool waiting = true;
   String slave_string = "";
 
@@ -109,7 +133,7 @@ String get_outputs_info(Output outputs[], int numberOfOutputs){
    *  (type_0, channel_0), ... (type_N, channel_N),!
    */
   String outputs_string = "";
-  
+
   for(int i=0; i < numberOfOutputs; i++){
     outputs_string = outputs_string + "(" + "'" + outputs[i].type + "'," + outputs[i].channel + "),";
   }
@@ -121,7 +145,7 @@ String get_inputs_info(Input inputs[], int numberOfInputs){
    *  (type_0, channel_0, variable_0), ... (type_N, channel_N, variable_N)
    */
   String inputs_string = "";
-  
+
   for (int i=0; i < numberOfInputs; i++){
     inputs_string = inputs_string + "(" + "'" + inputs[i].type + "'," + inputs[i].channel + "," + "'" + inputs[i].variable + "'" + "),";
   }
@@ -152,7 +176,7 @@ String write_slaves_inputs(String slaves[], int numberOfSlaves, int transmitPin)
      "slave1": [ins], ... "slaveN": [ins]
   */
   String slaves_input_data = "";
-  
+
   for (int i = 0; i < numberOfSlaves; i++) {
     slaves_input_data = slaves_input_data + "'" + slaves[i] + "':[";
     slaves_input_data = slaves_input_data + request_inputs_data(slaves[i], transmitPin);

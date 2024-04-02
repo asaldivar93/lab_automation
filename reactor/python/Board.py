@@ -27,7 +27,7 @@ import serial
 
 valid_baud_rates = [230400, 115200, 74880, 57600, 38400, 19200, 9600]
 valid_commands = {
-    "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1,
+    "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1, "GET_ALL_OUTPUTS": 6, "GET_ALL_INPUTS": 7
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
 valid_input_types = ["adc", "i2c", "spi", "pulse", "flow"]
@@ -38,12 +38,19 @@ class Dictlist(list):
     def __init__(self, iterable: list) -> None:
         list.extend(self, iterable)
         self._dict = self._generate_index()
+        self._dict1 = self._generate_index1()
 
     def _generate_index(self) -> dict:
         return {obj.id: k for k, obj in enumerate(self)}
 
+    def _generate_index1(self) -> dict:
+        return {"_".join([obj.address, str(obj.channel)]): k for k, obj in enumerate(self)}
+
     def get_by_id(self, id: str):
         return list.__getitem__(self, self._dict[id])
+
+    def get_by_channel(self, channel: str):
+        return list.__getitem__(self, self._dict1[channel])
 
 
 class config_handler(FileSystemEventHandler):
@@ -71,7 +78,7 @@ class Input():
     def __init__(self, address: str, type: str, channel: float, variable: str):
         validate_input_type(type)
         self.address = address
-        self.id = variable
+        self.id = "_".join([address, variable])
         self.variable = variable
         self.type = type
         self.channel = channel
@@ -149,19 +156,12 @@ class Board():
                 logging.warning(f" JSONDecodeError: {error}")
 
     def read_data(self):
-        data_str = self.readline()
-        if self.is_valid_data_string(data_str):
-            data_dict = self.load_json_to_dict(data_str)
-            return data_dict
-        else:
-            return {}
+        data_str = self.write_command(self.address, "GET_ALL_INPUTS")
+        data_dict = self.load_json_to_dict(data_str)
+        return data_dict
 
     def readline(self):
         return self.serial_port.readline().decode("UTF-8")
-
-    def is_valid_data_string(self, input_string: str) -> bool:
-        conditions = [input_string[0] == "{", "100,!" in input_string]
-        return all(conditions)
 
     def load_json_to_dict(self, json_string: str) -> dict:
         valid_json_string = self.convert_input_string_to_json(json_string)
@@ -171,7 +171,7 @@ class Board():
             return {}
 
     def convert_input_string_to_json(self, input_string: str) -> str:
-        return input_string.replace("115,!", "").replace("'", '"').replace(", }", "}").replace("100,!", "")
+        return input_string.replace("115,!", "").replace("'", '"').replace(", }", "}")
 
     def update_configuration(self):
         if self.is_config_updated:
@@ -189,10 +189,9 @@ class Board():
     def write_command(self, address: str, command: str, args: list = None):
         confirmation = False
         cmd_str = self.build_cmd_str(address, command, args)
+        self.serial_port.flushInput()
+        self.serial_port.write(cmd_str.encode())
         while not confirmation:
-            self.serial_port.write(cmd_str.encode())
-            self.serial_port.flush()
-            # self.serial_port.flushOutput()
             if self.serial_port.inWaiting() > 0:
                 input = self.readline()
                 if self.is_valid_input_string(input):

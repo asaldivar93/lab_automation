@@ -113,10 +113,7 @@ class Experiment():
     def build_experiment_columns_list(self):
         columns_list = [("date", "TEXT")]
         columns_list.extend(
-            [(output.id, "INT") for output in self.board.Outputs]
-        )
-        columns_list.extend(
-            [(input.variable, "REAL") for input in self.board.Inputs]
+            [(input.id, "REAL") for input in self.board.Inputs]
         )
         return columns_list
 
@@ -142,25 +139,13 @@ class Experiment():
         ids = ["date"]
         values = [f"'{time}'"]
 
-        address_list = data_dict["outs"].keys()
-        for address in address_list:
-            channels_list = data_dict["outs"][address]
+        for address in data_dict.keys():
+            channels_list = data_dict[address]
             ids_to_add = list()
             values_to_add = list()
             for channel, val in channels_list:
-                ids_to_add.append("_".join([address, str(channel)]))
-                values_to_add.append(str(val))
-            ids.extend(ids_to_add)
-            values.extend(values_to_add)
-
-        address_list = data_dict["ins"].keys()
-        for address in address_list:
-            channels_list = data_dict["ins"][address]
-            ids_to_add = list()
-            values_to_add = list()
-            for channel, val in channels_list:
-                variable = self.board.get_by_id("_".join([address, str(channel)])).variable
-                ids_to_add.append(variable)
+                input = self.board.Inputs.get_by_channel("_".join([address, str(channel)]))
+                ids_to_add.append(input.id)
                 values_to_add.append(str(val))
             ids.extend(ids_to_add)
             values.extend(values_to_add)

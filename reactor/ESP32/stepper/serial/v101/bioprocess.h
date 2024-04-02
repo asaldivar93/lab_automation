@@ -20,16 +20,12 @@
 // PWM PARAMETERS
 #define LEDC_BIT 8
 #define LEDC_BASE_FREQ 800
-
-// I2C SENSORS
-#define MPRLS_DEFAULT_ADDRESS 0x18
-
-#define SEN0322_DEFAULT_ADDRESS 0x73
-#define SEN0322_ADDRESS_0 0x70
-#define SEN0322_ADDRESS_1 0x71
-#define SEN0322_ADDRESS_2 0x72
-
-#define SEN0546_ADDRESS 0x40
+#define PIN_CH0 13
+#define PIN_CH1 12
+#define PIN_CH2 14
+#define PIN_CH3 27
+#define PIN_CH4 26
+#define PIN_CH5 25
 
 // Inputs and Outputs structures
 
@@ -123,7 +119,10 @@ typedef struct{
   String type;
   int channel;
   String variable;
+  int pin;
   double value;
+  double delta_pressure;
+  double last_pressure;
   String message_bp;
   Readfunc read;
 } Input;

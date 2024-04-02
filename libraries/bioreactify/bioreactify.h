@@ -7,9 +7,9 @@
 #define BIOPROCESS
 
 #define MANUAL 0
-#define TIMER 1
-#define PID 2
-#define ONOFF 3
+#define TIMER  1
+#define PID    2
+#define ONOFF  3
 
 // Communication pins to SPI
 #define SPI_CLK  5
@@ -20,18 +20,12 @@
 // PWM PARAMETERS
 #define LEDC_BIT 8
 #define LEDC_BASE_FREQ 800
-
-#define PULSES_PRESSURE_UB 11.4
-
-// I2C SENSORS
-#define MPRLS_DEFAULT_ADDRESS 0x18
-
-#define SEN0322_DEFAULT_ADDRESS 0x73
-#define SEN0322_ADDRESS_0 0x70
-#define SEN0322_ADDRESS_1 0x71
-#define SEN0322_ADDRESS_2 0x72
-
-#define SEN0546_ADDRESS 0x40
+#define PIN_CH0 13
+#define PIN_CH1 12
+#define PIN_CH2 14
+#define PIN_CH3 27
+#define PIN_CH4 26
+#define PIN_CH5 25
 
 // Inputs and Outputs structures
 
