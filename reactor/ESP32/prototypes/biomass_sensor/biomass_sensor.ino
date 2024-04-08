@@ -323,7 +323,7 @@ void send_board_info(void) {
   while(Serial2.available()){
     Serial2.read();
   }
-
+  
   for (int i = 0; i < N_SLAVES; i++) {
     slaves_input_info = slaves_input_info + "'" + slaves[i] + "':[";
     slaves_input_info = slaves_input_info + request_inputs_info(slaves[i], transmit_pin);
@@ -333,7 +333,7 @@ void send_board_info(void) {
 
   String outputs_string = "'outs':{'" + ADDRESS + "':[" + get_outputs_info(outputs, N_OUTPUTS) + "]," + slaves_output_info + "}";
   String inputs_string = "'ins':{'" + ADDRESS + "':[" + get_inputs_info(inputs, N_INPUTS) + get_inputs_info(pulses, N_PULSES) + "]," + slaves_input_info + "}";
-
+  
   String all_data_json = "{'address': '" + ADDRESS + "', 'samples_per_second': " + samples_per_second + ", ";
   all_data_json = all_data_json + outputs_string + ", " + inputs_string;
   all_data_json = all_data_json + "}115,!";

@@ -161,7 +161,8 @@ double Sensors::_read_sen0322(uint8_t address){
 
 
 double Sensors::read_mprls(uint8_t channel){
-  uint8_t _data[7];
+  uint8_t _size = 7;
+  uint8_t _data[_size];
 
   Wire.beginTransmission(_MPRLS_DEFAULT_ADDRESS);
   int _status = Wire.write(_request, 3);
@@ -171,7 +172,7 @@ double Sensors::read_mprls(uint8_t channel){
   }
 
   delay(6);
-  Wire.requestFrom(_MPRLS_DEFAULT_ADDRESS, 7);
+  Wire.requestFrom(_MPRLS_DEFAULT_ADDRESS, _size);
   for(int i=0; i < 7; i++){
     _data[i] = Wire.read();
   }
@@ -182,7 +183,8 @@ double Sensors::read_mprls(uint8_t channel){
 
 
 double Sensors::read_sen0546_temperature(uint8_t channel){
-  uint8_t _buffer[2];
+  uint8_t _size = 2;
+  uint8_t _buffer[_size];
   uint16_t _data;
 
   Wire.beginTransmission(_SEN0546_ADDRESS);
@@ -193,7 +195,7 @@ double Sensors::read_sen0546_temperature(uint8_t channel){
   }
 
   delay(10);
-  Wire.requestFrom(_SEN0546_ADDRESS, (uint8_t) 2);
+  Wire.requestFrom(_SEN0546_ADDRESS, _size);
   for(int i=0; i<2; i++){
     _buffer[i] = Wire.read();
   }
@@ -203,7 +205,8 @@ double Sensors::read_sen0546_temperature(uint8_t channel){
 
 
 double Sensors::read_sen0546_humidity(uint8_t channel){
-  uint8_t _buffer[2];
+  uint8_t _size = 2;
+  uint8_t _buffer[_size];
   uint16_t _data;
 
   Wire.beginTransmission(_SEN0546_ADDRESS);
@@ -214,7 +217,7 @@ double Sensors::read_sen0546_humidity(uint8_t channel){
   }
 
   delay(10);
-  Wire.requestFrom(_SEN0546_ADDRESS, (uint8_t) 2);
+  Wire.requestFrom(_SEN0546_ADDRESS, _size);
   for(int i=0; i<2; i++){
     _buffer[i] = Wire.read();
   }

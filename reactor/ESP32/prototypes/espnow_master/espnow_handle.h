@@ -15,7 +15,7 @@
 #define Rx 16
 #define Tx 17
 
-String parse_serial_master(bool *new_command);
+String parse_serial(char inChar[], bool *newCommand);
 
 String parse_serial_slave(bool *new_command);
 

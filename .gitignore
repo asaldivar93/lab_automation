@@ -21,6 +21,7 @@ tool_database/
 figures/
 output/
 results/
+*.ipynb
 *.db
 *.tsv
 *.csv

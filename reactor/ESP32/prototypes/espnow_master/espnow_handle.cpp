@@ -1,21 +1,22 @@
 #include <Arduino.h>
-#include "comms_handle.h"
+#include "espnow_handle.h"
 #include "bioreactify.h"
 
-String parse_serial_master(bool *new_command) {
+String parse_serial(char inChar[], bool *newCommand) {
   /*
   Reads Serial buffer
   */
-  String input_string = "";
-  while (Serial.available()) {
-    char inChar = char(Serial.read());
-    input_string += inChar;
-    if (inChar == '!') {
-      *new_command = true;
+  String inputString = "";
+  int i = 0;
+  while (i < 255) {
+    inputString += inChar[i];
+    if (inChar[i] == '!') {
+      *newCommand = true;
       break;
     }
+    i++;
   }
-  return input_string;
+  return inputString;
 }
 
 
@@ -155,10 +156,10 @@ String get_inputs_info(Input inputs[], int numberOfInputs){
 void send_input_data(String address, String slaves[], int numberOfSlaves, int transmitPin, String *inputsBuffer, String *pulsesBuffer) {
   /*
     Gathers all sensor readings to Serial in a dictionary string with structure:
-    {"master": [ins], "slave1": [ins], ... "slaveN": [ins]}100,!
+    {"master": [ins], "slave1": [ins], ... "slaveN": [ins]}115,!
   */
   String inputs_string = "{'" + address + "':[" + *inputsBuffer + *pulsesBuffer + "],";
-  inputs_string = inputs_string + write_slaves_inputs(slaves, numberOfSlaves, transmitPin) + "}100,!";
+  inputs_string = inputs_string + write_slaves_inputs(slaves, numberOfSlaves, transmitPin) + "}115,!";
   Serial.println(inputs_string);
 
   // Clear all buffers to keep most recent readings only
@@ -206,7 +207,7 @@ void send_output_data(String address, String slaves[], int numberOfSlaves, int t
     {"master": [outs], "slave1": [outs], ... "slaveN": [outs]}
   */
   String outputs_string = "{'" + address + "':[" + *outputsBuffer + "],";
-  outputs_string = outputs_string + write_slaves_outputs(slaves, numberOfSlaves, transmitPin) + "}100,!";
+  outputs_string = outputs_string + write_slaves_outputs(slaves, numberOfSlaves, transmitPin) + "}115,!";
   Serial.println(outputs_string);
 
   // Clear all buffers to keep most recent readings only

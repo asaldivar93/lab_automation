@@ -1,0 +1,20 @@
+parse_serial_master	KEYWORD2
+parse_slave_to_master	KEYWORD2
+request_outputs_info	KEYWORD2
+request_outputs_data	KEYWORD2
+write_slaves_outputs	KEYWORD2
+update_outputs_buffer	KEYWORD2
+update_inputs_buffer	KEYWORD2
+request_inputs_info	KEYWORD2
+request_inputs_data	KEYWORD2
+get_outputs_info	KEYWORD2
+write_slaves_inputs	KEYWORD2
+send_output_data	KEYWORD2
+parse_serial_slave	KEYWORD2
+write_to_master	KEYWORD2
+write_to_slaves	KEYWORD2
+get_inputs_info	KEYWORD2
+send_input_data	KEYWORD2
+send_board_info	KEYWORD2
+parse_string	KEYWORD2
+
