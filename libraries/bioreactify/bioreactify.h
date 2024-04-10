@@ -125,6 +125,8 @@ typedef struct{
   double last_pressure;
   String message_bp;
   Readfunc read;
+  bool is_on;
+  unsigned long start_millis;
 } Input;
 
 typedef struct {
