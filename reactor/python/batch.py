@@ -36,7 +36,12 @@ while True:
 
             data_dict = {}
             for board in boards:
-                data_dict = data_dict | board.read_data()
+                try:
+                    data_dict = data_dict | board.read_data()
+                except termios.error as e:
+                    Board.logging.warning(e)
+                    board.reconnect()
+                    board.is_config_updated = True
 
             date = datetime.now()
 
@@ -53,8 +58,3 @@ while True:
         board.config_observer.stop()
         board.serial_port.close()
         sqlite_db.connection.close()
-
-    except termios.error as e:
-        print(e)
-        experiment.board.reconnect()
-        board.is_config_updated = True

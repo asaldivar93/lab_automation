@@ -20,10 +20,12 @@ from watchdog.events import FileSystemEventHandler
 
 import serial
 
-# logging.basicConfig(
-#     filename="record.log", encoding='utf-8',
-#     level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s'
-# )
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logging.basicConfig(
+    filename="record.log", encoding='utf-8',
+    level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s'
+)
 
 valid_baud_rates = [230400, 115200, 74880, 57600, 38400, 19200, 9600]
 valid_commands = {
@@ -92,6 +94,7 @@ class Board():
         self.address = address
         self.id = address
         self.channel = 0
+        self.port_name = port_name
 
         self.set_serial_port(port_name)
         self.set_baud_rate(baud_rate)
@@ -103,7 +106,6 @@ class Board():
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
         print("Connection successfull\n")
-        logging.info("Connection successfull\n")
 
         self.config_dir = config_dir
         self.read_config_json()
@@ -156,7 +158,7 @@ class Board():
                 self.config_dict = json.load(file)
                 self.is_config_updated = True
             except ValueError as error:
-                logging.warning(f" JSONDecodeError: {error}")
+                logger.warning(f" JSONDecodeError: {error}")
 
     def read_data(self):
         data_str = self.write_command(self.address, "GET_ALL_DATA")
@@ -173,7 +175,8 @@ class Board():
         except SyntaxError:
             return {}
         except ValueError as e:
-            print(e)
+            logger.warning(e)
+            logger.warning(valid_json_string)
             return {}
 
     def convert_input_string_to_json(self, input_string: str) -> str:
@@ -190,7 +193,6 @@ class Board():
                 args_queue.pop(0)
             self.is_config_updated = False
             print("Board configuration updated")
-            logging.info("Board configuration updated")
 
     def write_command(self, address: str, command: str, args: list = None):
         confirmation = False
@@ -220,7 +222,7 @@ class Board():
         try:
             cmd = valid_commands[command]
         except KeyError:
-            logging.warning(f"{command} not a valid command, must be one of {valid_commands}")
+            logger.warning(f"{command} not a valid command, must be one of {valid_commands}")
 
         if args:
             args = ','.join(map(str, args))
@@ -241,7 +243,7 @@ class Board():
                 output = self.Outputs.get_by_id(channel_id)
                 current_control = output.control_mode
             except KeyError:
-                logging.warning(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
+                print(f"{channel_id} not an available channel, must be one of {self.Outputs._dict.keys()}")
             else:
                 match config_dict[channel_id]:
                     case {"mode": "MANUAL", "value": value}:
@@ -251,7 +253,7 @@ class Board():
                                 args_queue.append([output.address, new_control.get_args()])
                                 output.control_mode = new_control
                         else:
-                            logging.warning(f"In {channel_id}, value must be of type(int)")
+                            print(f"In {channel_id}, value must be of type(int)")
 
                     case {"mode": "TIMER", "value": value, "time_on": time_on, "time_off": time_off}:
                         if all([isinstance(time_on, int), isinstance(time_off, int), isinstance(value, int)]):
@@ -262,14 +264,14 @@ class Board():
                                 args_queue.append([output.address, new_control.get_args()])
                                 output.control_mode = new_control
                         else:
-                            logging.warning(f"In {channel_id}, value/time_on/time_off must be of type(int)")
+                            print(f"In {channel_id}, value/time_on/time_off must be of type(int)")
 
                     case {"mode": "PID", "variable": variable, "setpoint": setpoint}:
                         if isinstance(setpoint, (float, int)):
                             try:
                                 input = self.Inputs.get_by_id(variable)
                             except KeyError:
-                                logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
+                                print(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
                                 new_control = pid_control(output.channel, input.channel, setpoint)
                                 if not new_control == current_control:
@@ -277,16 +279,16 @@ class Board():
                                         args_queue.append([output.address, new_control.get_args()])
                                         output.control_mode = new_control
                                     else:
-                                        logging.warning(f"In {channel_id}, control variable must be on same board as output channel")
+                                        print(f"In {channel_id}, control variable must be on same board as output channel")
                         else:
-                            logging.warning(f"In {channel_id}, setpoint must be of type([float,int])")
+                            print(f"In {channel_id}, setpoint must be of type([float,int])")
 
                     case {"mode": "ONOFF", "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound, "value": value}:
                         if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
                             try:
                                 input = self.Inputs.get_by_id(variable)
                             except KeyError:
-                                logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
+                                print(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
                                 new_control = onoff_control(output.channel, input.channel, lower_bound, upper_bound, value)
                                 if not new_control == current_control:
@@ -294,15 +296,15 @@ class Board():
                                         args_queue.append([output.address, new_control.get_args()])
                                         output.control_mode = new_control
                                     else:
-                                        logging.warning(f"In {channel_id}, control variable must be on same board as output channel")
+                                        print(f"In {channel_id}, control variable must be on same board as output channel")
                         else:
-                            logging.warning(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
+                            print(f"In {channel_id}, lower_bound/upper_bound must be of type([float,int])")
 
                     case {"mode": mode}:
-                        logging.warning(f"{mode} mode must be on of {valid_control_modes}")
+                        print(f"{mode} mode must be on of {valid_control_modes}")
 
                     case _:
-                        logging.warning(f"{config_dict[channel_id]}")
+                        print(f"{config_dict[channel_id]}")
 
         return args_queue
 
@@ -312,21 +314,21 @@ class Board():
         self.serial_port.close()
         self.serial_port = None
         time.sleep(2)
-        logging.warning("Serial Port Dissconected")
-        logging.warning('Opening connection')
+        logger.warning("Serial Port Dissconected")
+        logger.warning('Opening connection')
         while self.serial_port is None:
             time.sleep(5)
 
             try:
                 available_ports = get_available_serial_ports()
                 print(available_ports)
-                self.open_connection(available_ports[0])
+                self.open_connection(self.port_name)
             except SerialException:
-                logging.warning(f"Unsuccessfull: {get_available_serial_ports()}")
+                logger.warning(f"Unsuccessfull: {get_available_serial_ports()}")
 
         self.serial_port.flushInput()
         self.serial_port.flushOutput()
-        logging.warning("Device Reconneted")
+        logger.warning("Device Reconneted")
         time.sleep(0.5)
 
 

@@ -19,7 +19,7 @@ String input_string = "";
 // Seriaf buffers
 String outputs_buffer = "";
 String inputs_buffer = "";
-String volumes_buffer = "(8,0.00)";
+String volumes_buffer = "";
 
 // Config Data
 Slave slaves[N_SLAVES] =
@@ -226,13 +226,13 @@ void loop() {
 
   pulse_counter();
   if (VOLUMES_READY) {
-    
+
     outputs[0].write_output();
     reset_pulse_counters();
     update_inputs_buffer(volumes, N_VOLUMES, &volumes_buffer);
-    
+
     esp_timer_start_once(timer_volumes_handle, volumes_time);
-    VOLUMES_READY = false; 
+    VOLUMES_READY = false;
   }
 
 }
