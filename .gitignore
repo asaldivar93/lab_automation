@@ -23,6 +23,8 @@ output/
 results/
 *.ipynb
 *.db
+*.db-shm
+*.db-wal
 *.tsv
 *.csv
 *.log

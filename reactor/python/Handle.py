@@ -12,6 +12,8 @@ import os
 
 import pandas as pd
 
+from Board import Dictlist
+
 EXPERIMENTS_DATABASE_PATH = "experiments_db.tsv"
 inputs_columns_list = [("board", "TEXT"), ("experiment", "TEXT"),
                        ("type", "TEXT"), ("channel", "INT"), ("id", "TEXT")]
@@ -19,7 +21,8 @@ inputs_columns_list = [("board", "TEXT"), ("experiment", "TEXT"),
 
 class Database():
     def __init__(self, DATABASE_PATH: str = "database.db"):
-        self.connection = sqlite3.connect(DATABASE_PATH)
+        self.connection = sqlite3.connect(DATABASE_PATH, isolation_level=None)
+        self.connection.execute('pragma journal_mode=wal')
         self.connection.row_factory = self.namedtuple_factory
         self.cursor = self.connection.cursor()
         self.set_inputs_table()
@@ -60,13 +63,16 @@ class Database():
 
 
 class Experiment():
-    def __init__(self, name, sqlite_db, board):
+    def __init__(self, name, sqlite_db, boards):
         self.name = name
         self.sqlite_db = sqlite_db
-        self.board = board
+        self.set_boards(boards)
         if self.is_new_experiment():
             self.start_time = datetime.now()
             self.create_experiment_record()
+
+    def set_boards(self, boards):
+        self.boards = Dictlist(boards)
 
     def is_new_experiment(self):
         if os.path.isfile(EXPERIMENTS_DATABASE_PATH):
@@ -80,7 +86,7 @@ class Experiment():
 
     def create_experiment_record(self):
         self.add_to_experiments_db()
-        self.add_to_inputs_table()
+        # self.add_to_inputs_table()
         self.create_experiment_table()
 
     def add_to_experiments_db(self):
@@ -112,25 +118,17 @@ class Experiment():
 
     def build_experiment_columns_list(self):
         columns_list = [("date", "TEXT")]
-        columns_list.extend(
-            [(input.id, "REAL") for input in self.board.Inputs]
-        )
+
+        for board in self.boards:
+            columns_list.extend(
+                [(output.id, "INTEGER") for output in board.Outputs]
+            )
+
+        for board in self.boards:
+            columns_list.extend(
+                [(input.id, "REAL") for input in board.Inputs]
+            )
         return columns_list
-
-    def get_sample_period(self, period_time_seconds: float = 1) -> int:
-        """
-        Calculates the time between saves to the database. This function uses
-        the sampling frequency of the boart to calculate the number of samples
-        recieved from the board between a given time period
-
-        Input:
-            period_time_seconds: the number of seconds between each save to the
-            database
-
-        Output:
-            sample_number: the number of samples recieved in in each period
-        """
-        return self.board.samples_per_second * period_time_seconds
 
     def save_data(self, time, data_dict):
         table_name = self.name
@@ -139,17 +137,36 @@ class Experiment():
         ids = ["date"]
         values = [f"'{time}'"]
 
-        for address in data_dict.keys():
-            channels_list = data_dict[address]
-            ids_to_add = list()
-            values_to_add = list()
-            for channel, val in channels_list:
-                input = self.board.Inputs.get_by_channel("_".join([address, str(channel)]))
-                ids_to_add.append(input.id)
-                values_to_add.append(str(val))
-            ids.extend(ids_to_add)
-            values.extend(values_to_add)
+        ids_to_add, values_to_add = self.build_sql_row_list(data_dict, "outputs")
+        ids.extend(ids_to_add)
+        values.extend(values_to_add)
+
+        ids_to_add, values_to_add = self.build_sql_row_list(data_dict, "inputs")
+
+        ids.extend(ids_to_add)
+        values.extend(values_to_add)
 
         columns_str = ", ".join(ids)
         values_str = ", ".join(values)
         self.sqlite_db.insert_row(table_name, columns_str, values_str)
+
+    def build_sql_row_list(self, data_dict, channel_type):
+        ids_list = list()
+        values_list = list()
+        for address in data_dict.keys():
+            board = self.boards.get_by_id(address)
+
+            if channel_type == "inputs":
+                channels_list = data_dict[address]["ins"]
+            elif channel_type == "outputs":
+                channels_list = data_dict[address]["outs"]
+
+            for chn, val in channels_list:
+                if channel_type == "inputs":
+                    channel = board.Inputs.get_by_channel("_".join([address, str(chn)]))
+                elif channel_type == "outputs":
+                    channel = board.Outputs.get_by_channel("_".join([address, str(chn)]))
+                ids_list.append(channel.id)
+                values_list.append(str(val))
+
+        return ids_list, values_list

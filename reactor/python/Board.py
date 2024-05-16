@@ -27,10 +27,10 @@ import serial
 
 valid_baud_rates = [230400, 115200, 74880, 57600, 38400, 19200, 9600]
 valid_commands = {
-    "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1, "GET_ALL_OUTPUTS": 6, "GET_ALL_INPUTS": 7
+    "GET_BOARD_INFO": 0, "UPDATE_CONFIGURATION": 1, "GET_ALL_DATA": 2
 }
 valid_control_modes = {"MANUAL": 0, "TIMER": 1, "PID": 2, "ONOFF": 3}
-valid_input_types = ["adc", "i2c", "spi", "pulse", "flow"]
+valid_input_types = ["adc", "i2c", "spi", "vol"]
 valid_output_types = {"pwm": range(0, 255), "digital": [0, 1], "stp": range(0, 1000)}
 
 
@@ -90,10 +90,12 @@ class Input():
 class Board():
     def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400, config_dir: str = "configuration/"):
         self.address = address
+        self.id = address
+        self.channel = 0
 
         self.set_serial_port(port_name)
         self.set_baud_rate(baud_rate)
-        self.open_connection()
+        self.open_connection(port_name)
 
         board_info_dict = self.request_board_info()
         self.samples_per_second = board_info_dict["samples_per_second"]
@@ -114,7 +116,8 @@ class Board():
         validate_baud_rate(baud_rate)
         self.baud_rate = baud_rate
 
-    def open_connection(self):
+    def open_connection(self, port_name):
+        self.port_name = port_name
         self.serial_port = serial.Serial(port=self.port_name, baudrate=self.baud_rate, timeout=2)
 
     def request_board_info(self):
@@ -156,7 +159,7 @@ class Board():
                 logging.warning(f" JSONDecodeError: {error}")
 
     def read_data(self):
-        data_str = self.write_command(self.address, "GET_ALL_INPUTS")
+        data_str = self.write_command(self.address, "GET_ALL_DATA")
         data_dict = self.load_json_to_dict(data_str)
         return data_dict
 
@@ -168,6 +171,9 @@ class Board():
         try:
             return ast.literal_eval(valid_json_string)
         except SyntaxError:
+            return {}
+        except ValueError as e:
+            print(e)
             return {}
 
     def convert_input_string_to_json(self, input_string: str) -> str:
@@ -192,10 +198,9 @@ class Board():
         self.serial_port.flushInput()
         self.serial_port.write(cmd_str.encode())
         while not confirmation:
-            if self.serial_port.inWaiting() > 0:
-                input = self.readline()
-                if self.is_valid_input_string(input):
-                    confirmation = True
+            input = self.readline()
+            if self.is_valid_input_string(input):
+                confirmation = True
 
         return input
 
@@ -279,7 +284,7 @@ class Board():
                     case {"mode": "ONOFF", "variable": variable, "lower_bound": lower_bound, "upper_bound": upper_bound, "value": value}:
                         if all([isinstance(lower_bound, (float, int)), isinstance(upper_bound, (float, int)), isinstance(value, int)]):
                             try:
-                                input = self.Inputs.get_by_id(variable).channel
+                                input = self.Inputs.get_by_id(variable)
                             except KeyError:
                                 logging.warning(f"In {channel_id} variable={variable} must be one of {self.Inputs._dict.keys()}")
                             else:
@@ -313,7 +318,9 @@ class Board():
             time.sleep(5)
 
             try:
-                self.open_connection()
+                available_ports = get_available_serial_ports()
+                print(available_ports)
+                self.open_connection(available_ports[0])
             except SerialException:
                 logging.warning(f"Unsuccessfull: {get_available_serial_ports()}")
 

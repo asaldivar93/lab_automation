@@ -1,10 +1,6 @@
 #include <Arduino.h>
 #include "bioreactify.h"
 
-unsigned long int set_sample_time(unsigned long int samples_per_second){
-  unsigned long int sample_time = 1000000 / samples_per_second;
-  return sample_time;
-}
 
 Sensors::Sensors(uint8_t dataIn, uint8_t dataOut, uint8_t clock)
 {
@@ -36,7 +32,7 @@ void Sensors::begin(uint8_t select)
 }
 
 
-void Sensors::set_ref_voltage(double ref_voltage){
+void Sensors::set_ref_voltage(float ref_voltage){
   _ref_voltage = ref_voltage;
 }
 
@@ -45,13 +41,13 @@ void Sensors::set_spi_speed(uint32_t speed){
   _spi_settings = SPISettings(_SPIspeed, MSBFIRST, SPI_MODE0);
 }
 
-void Sensors::set_mprls_range(double p_min, double p_max){
+void Sensors::set_mprls_range(float p_min, float p_max){
   _p_min = p_min;
   _p_max = p_max;
 }
 
 
-double Sensors::read_adc(uint8_t channel){
+float Sensors::read_adc(uint8_t channel){
   if (channel >= _channels) return 0;
 
   uint8_t  data[3] = { 0,0,0 };
@@ -94,27 +90,27 @@ uint8_t Sensors::_build_request_mcp3208(uint8_t channel, uint8_t * data){
 }
 
 
-double Sensors::read_sen0322_address_0(uint8_t channel){
+float Sensors::read_sen0322_address_0(uint8_t channel){
   return _read_sen0322(_SEN0322_ADDRESS_0);
 }
 
 
-double Sensors::read_sen0322_address_1(uint8_t channel){
+float Sensors::read_sen0322_address_1(uint8_t channel){
   return _read_sen0322(_SEN0322_ADDRESS_1);
 }
 
 
-double Sensors::read_sen0322_address_2(uint8_t channel){
+float Sensors::read_sen0322_address_2(uint8_t channel){
   return _read_sen0322(_SEN0322_ADDRESS_2);
 }
 
 
-double Sensors::read_sen0322_default(uint8_t channel){
+float Sensors::read_sen0322_default(uint8_t channel){
   return _read_sen0322(_SEN0322_DEFAULT_ADDRESS);
 }
 
 
-double Sensors::_read_sen0322(uint8_t address){
+float Sensors::_read_sen0322(uint8_t address){
   uint8_t _data[10]={0};
   Wire.beginTransmission(address);
   int _status = Wire.write(_o2_data_register);
@@ -128,11 +124,11 @@ double Sensors::_read_sen0322(uint8_t address){
   for(int i=0; i<3; i++){
     _data[i] = Wire.read();
   }
-  return _cal * ((double)_data[0] + ( (double)_data[1] / 10.0) + ( (double)_data[2] / 100.0));
+  return _cal * ((float)_data[0] + ( (float)_data[1] / 10.0) + ( (float)_data[2] / 100.0));
 }
 
 
-double Sensors::read_mprls(uint8_t channel){
+float Sensors::read_mprls(uint8_t channel){
   uint8_t _size = 7;
   uint8_t _data[_size];
 
@@ -148,13 +144,13 @@ double Sensors::read_mprls(uint8_t channel){
   for(int i=0; i < 7; i++){
     _data[i] = Wire.read();
   }
-  _press_counts = (double)_data[3] + (double)_data[2] * 256 + (double)_data[1] * 65536;
+  _press_counts = (float)_data[3] + (float)_data[2] * 256 + (float)_data[1] * 65536;
   _pressure = (( (_press_counts - _out_min) * (_p_max - _p_min) ) / (_out_max - _out_min)) + _p_min;
   return _pressure * _conversion;
 }
 
 
-double Sensors::read_sen0546_temperature(uint8_t channel){
+float Sensors::read_sen0546_temperature(uint8_t channel){
   uint8_t _size = 2;
   uint8_t _buffer[_size];
   uint16_t _data;
@@ -172,11 +168,11 @@ double Sensors::read_sen0546_temperature(uint8_t channel){
     _buffer[i] = Wire.read();
   }
   _data = _buffer[0] << 8 | _buffer[1];
-  return 165 * ( (double)_data / 65535.0) - 40;
+  return 165 * ( (float)_data / 65535.0) - 40;
 }
 
 
-double Sensors::read_sen0546_humidity(uint8_t channel){
+float Sensors::read_sen0546_humidity(uint8_t channel){
   uint8_t _size = 2;
   uint8_t _buffer[_size];
   uint16_t _data;
@@ -194,5 +190,141 @@ double Sensors::read_sen0546_humidity(uint8_t channel){
     _buffer[i] = Wire.read();
   }
   _data = _buffer[0] << 8 | _buffer[1];
-  return 100 * ( (double)_data / 65535.0);
+  return 100 * ( (float)_data / 65535.0);
+}
+
+Output::Output(int Channel, int Pin, String Type, int Control_mode, int Value){
+  channel = Channel;
+  pin = Pin;
+  type = Type;
+  control_mode = Control_mode;
+  manual_value = Value;
+}
+
+void Output::get_info(void){
+  Serial.println(type);
+}
+
+void Output::write_output(void) {
+
+  switch (control_mode) {
+    case MANUAL:
+      value = manual_value;
+      break;
+
+    case TIMER:
+      _delta_time = _delta_time + 1;
+      if (_delta_time > _current_timer) {
+        if (_is_on) {
+          _is_on = false;
+        }
+        else {
+          _is_on = true;
+        }
+        _delta_time = 0;
+      }
+
+      if (_is_on) {
+        _current_timer = _time_on;
+        value = manual_value;
+      }
+      else {
+        _current_timer = _time_off;
+        value = 0;
+      }
+      break;
+
+    case PID:
+      _filtered_input = _alpha * (*_input_value) + (1 - _alpha) * _filtered_input;
+      value = compute_pid(_filtered_input);
+      break;
+
+    case ONOFF:
+      if ((*_input_value) < _input_value_lb) {
+        value = manual_value;
+      }
+      if ((*_input_value) > _input_value_ub) {
+        value = 0;
+      }
+      break;
+  }
+  ledcWrite(channel, value);
+}
+
+void Output::set_manual_output(int value){
+  control_mode = 0;
+  manual_value = value;
+}
+
+void Output::set_timer(int time_on, int time_off, int value){
+  control_mode = 1;
+  _time_on = time_on;
+  _time_off = time_off;
+  manual_value = value;
+
+  _delta_time = 0;
+  _current_timer = _time_on;
+  _is_on = true;
+}
+
+void Output::set_pid(float *input_value, float setpoint){
+  control_mode = 2;
+  _input_value = input_value;
+  _setpoint = setpoint;
+}
+
+void Output::set_onoff(float *input_value, int lb, int ub, int value){
+  control_mode = 3;
+  _input_value = input_value;
+  _input_value_lb = lb;
+  _input_value_ub = ub;
+  manual_value = value;
+}
+
+float Output::compute_pid(float input) {
+  float output;
+  uint32_t now = micros();
+  uint32_t time_change = (now - _last_time);
+
+  float error = _setpoint - input;
+  float d_error = error - _last_error;
+
+  float p_term = _kp * error;
+  float i_term = _ki  * error;
+  float d_term = _kd * d_error;
+
+  _integral_sum += i_term;
+  _integral_sum = constrain(_integral_sum, _output_min, _output_max);
+  output = constrain(_integral_sum + p_term + d_term, _output_min, _output_max);
+  
+  _last_error = error;
+  _last_time = now;
+  
+  return output;
+}
+
+void Output::set_sample_time(uint32_t sample_time){
+  _sample_time = sample_time;
+}
+
+void Output::set_gh_filter(float alpha){
+  _alpha = alpha;
+}
+
+void Output::set_pid_tunings(float kp, float ki, float kd){
+  _kp = kp;
+  _ki = ki;
+  _kd = kd;
+}
+
+void Output::set_output_limits(float min, float max){
+  _output_min = min;
+  _output_max = max;
+}
+
+void Output::initialize_pid(){
+  _last_time = micros() - _sample_time;
+  _last_error = 0;
+  _integral_sum = 0;
+  _filtered_input = (*_input_value);
 }

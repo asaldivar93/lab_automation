@@ -2,13 +2,12 @@
 #include <esp_now.h>
 #include <WiFi.h>
 
-#include "QuickPID.h"
 #include "bioreactify.h"
 #include "comms_handle.h"
 
 #define N_OUTPUTS 5
 #define N_INPUTS  8
-#define N_PULSES  1
+#define N_VOLUMES  1
 #define N_SLAVES  1
 
 // Serial info
@@ -20,17 +19,11 @@ String input_string = "";
 // Seriaf buffers
 String outputs_buffer = "";
 String inputs_buffer = "";
-String pulses_buffer = "";
+String volumes_buffer = "(8,0.00)";
 
 // Config Data
 Slave slaves[N_SLAVES] =
-{ {"S1", {0x58, 0xBF, 0x25, 0x36, 0x78, 0x94}, "", "(stp,0),(stp,1),(stp,2)"} };
-
-Output outputs[N_OUTPUTS] =
-{ {ADDRESS, "pwm", 0, PIN_CH0, MANUAL, 0}, {ADDRESS, "pwm", 1, PIN_CH1, MANUAL, 0},
-  {ADDRESS, "pwm", 2, PIN_CH2, MANUAL, 0}, {ADDRESS, "pwm", 3, PIN_CH3, MANUAL, 0},
-  {ADDRESS, "pwm", 4, PIN_CH4, MANUAL, 0}
-};
+{ {"S1", {0x58, 0xBF, 0x25, 0x36, 0x78, 0x94}, "", "('stp',0),('stp',1),('stp',2)"} };
 
 Input inputs[N_INPUTS] =
 { {ADDRESS, "adc", 0, "current"}, {ADDRESS, "adc", 1, "dissolved_oxygen"},
@@ -39,31 +32,28 @@ Input inputs[N_INPUTS] =
   {ADDRESS, "adc", 6, "dump_3"}, {ADDRESS, "adc", 7, "dump_4"}
 };
 
-Input pulses[N_PULSES] = { {ADDRESS, "pulse", 8, "delta_pressure", PIN_CH5} };
+Input volumes[N_VOLUMES] = { {ADDRESS, "vol", 8, "vol_ml_per_10s", PIN_CH5} };
 
-// Measurment Variables
-double analog[N_INPUTS]; // This is an accumulator variable for analog inputs
-boolean DATA_READY = false;
-boolean PULSES_READY = false;
-double sample_number;
-unsigned long int samples_per_second = 4;
-unsigned long int sample_time;
-unsigned long int pulses_time = 60000000;
-int counter = 0;
+Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
+Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
+Output CH_2(2, PIN_CH2, "pwm", MANUAL, 0);
+Output CH_3(3, PIN_CH3, "pwm", MANUAL, 0);
+Output CH_4(4, PIN_CH4, "pwm", MANUAL, 0);
+Output outputs[N_OUTPUTS] = {CH_0, CH_1, CH_2, CH_3, CH_4};
 
-// PID Channels
 float Kp = 100;
 float Ki = 0.2;
 float Kd = 0.;
 
-float pid_filter[N_OUTPUTS], pid_output[N_OUTPUTS], pid_setpoint[N_OUTPUTS];
-QuickPID PID_0(&pid_filter[0], &pid_output[0], &pid_setpoint[0]);
-QuickPID PID_1(&pid_filter[1], &pid_output[1], &pid_setpoint[1]);
-QuickPID PID_2(&pid_filter[2], &pid_output[2], &pid_setpoint[2]);
-QuickPID PID_3(&pid_filter[3], &pid_output[3], &pid_setpoint[3]);
-QuickPID PID_4(&pid_filter[4], &pid_output[4], &pid_setpoint[4]);
-//QuickPID PID_5(&pid_filter[5], &pid_output[5], &pid_setpoint[5]);
-QuickPID all_pids[N_OUTPUTS] = {PID_0, PID_1, PID_2, PID_3, PID_4}; //, PID_5};
+// Measurment Variables
+float analog[N_INPUTS]; // This is an accumulator variable for analog inputs
+boolean DATA_READY = false;
+boolean VOLUMES_READY = false;
+int sample_number;
+uint32_t samples_per_second = 4;
+uint32_t one_second = 1000000;
+uint32_t sample_time = one_second / samples_per_second;
+uint32_t volumes_time = 1 * one_second;
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
@@ -76,10 +66,10 @@ void flag_data_ready(void *p) {
 }
 
 // Timer for pulse counter
-esp_timer_create_args_t timer_pulses_args;
-esp_timer_handle_t timer_pulses_handle;
-void flag_pulses_ready(void *p) {
-  PULSES_READY = true;
+esp_timer_create_args_t timer_volumes_args;
+esp_timer_handle_t timer_volumes_handle;
+void flag_volumes_ready(void *p) {
+  VOLUMES_READY = true;
 }
 
 // Parallel task for communication
@@ -130,37 +120,33 @@ void init_comms(void){
 
 void init_outputs(void){
   // Solenoids for flow measurments
-  for (int i = 0; i < N_PULSES; i++) {
-    ledcSetup(pulses[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
-    ledcAttachPin(pulses[i].pin, pulses[i].channel);
+  for (int i = 0; i < N_VOLUMES; i++) {
+    ledcSetup(volumes[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
+    ledcAttachPin(volumes[i].pin, volumes[i].channel);
   }
 
   // True outputs
-  sample_time = set_sample_time(samples_per_second);
-
   for (int i = 0; i < N_OUTPUTS; i++) {
-    if (outputs[i].type == "pwm") {
-      ledcSetup(outputs[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
-      ledcAttachPin(outputs[i].pin, outputs[i].channel);
-      ledcWrite(outputs[i].channel, outputs[i].value);
-    }
-    all_pids[i].SetMode(all_pids[i].Control::manual);
-    all_pids[i].SetOutputLimits(0, 255);
-    all_pids[i].SetTunings(Kp, Ki, Kd);
-    all_pids[i].SetSampleTimeUs(sample_time);
-    all_pids[i].SetAntiWindupMode(all_pids[i].iAwMode::iAwClamp);
+    ledcSetup(outputs[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
+    ledcAttachPin(outputs[i].pin, outputs[i].channel);
+    ledcWrite(outputs[i].channel, outputs[i].value);
+
+    outputs[i].set_output_limits(0, 255);
+    outputs[i].set_pid_tunings(Kp, Ki, Kd);
+    outputs[i].set_sample_time(sample_time);
+    outputs[i].set_gh_filter(0.01);
   }
 }
 
 void init_timers(void){
-  // Initialize timers for sensors and pulses;
+  // Initialize timers for sensors and volumes;
   timer_sensor_args.callback = flag_data_ready;
   esp_timer_create(&timer_sensor_args, &timer_sensors_handle);
   esp_timer_start_once(timer_sensors_handle, sample_time);
 
-  timer_pulses_args.callback = flag_pulses_ready;
-  esp_timer_create(&timer_pulses_args, &timer_pulses_handle);
-  esp_timer_start_once(timer_pulses_handle, pulses_time);
+  timer_volumes_args.callback = flag_volumes_ready;
+  esp_timer_create(&timer_volumes_args, &timer_volumes_handle);
+  esp_timer_start_once(timer_volumes_handle, volumes_time);
 }
 
 void setup() {
@@ -168,7 +154,7 @@ void setup() {
   init_comms();
   init_outputs();
   init_timers();
-  
+
   // ------------ Modify Configuration -------------- //
   sensors.begin(CS0);
   sensors.set_spi_speed(1000000);
@@ -183,7 +169,7 @@ void setup() {
   inputs[5].read = &Sensors::read_adc;
   inputs[6].read = &Sensors::read_adc;
   inputs[7].read = &Sensors::read_adc;
-  pulses[0].read = &Sensors::read_mprls;
+  volumes[0].read = &Sensors::read_mprls;
 
   // Initialize measurments
   moving_average();
@@ -199,13 +185,10 @@ void setup() {
   reset_moving_average();
   delay(100);
 
-  for(int i=0; i<N_PULSES; i++){
-    pulses[i].last_pressure = (sensors.*pulses[i].read)(i);
+  for(int i=0; i<N_VOLUMES; i++){
+    volumes[i].last_pressure = (sensors.*volumes[i].read)(i);
   }
 
-  String input_string = "M0 1,2,3,4,51.5,!";
-  new_command = true;
-  parse_string(input_string);
   // ------------ Modify Configuration -------------- //
 }
 
@@ -224,15 +207,17 @@ void loop() {
     inputs[5].value = get_temperature(analog[5]);
     inputs[6].value = get_temperature(analog[6]);
     inputs[7].value = get_temperature(analog[7]);
-    inputs[8].value = analog[8];
-    inputs[9].value = analog[9];
+
+    outputs[1].write_output();
+    outputs[2].write_output();
+    outputs[3].write_output();
+    outputs[4].write_output();
     // ------------ Modify Configuration -------------- //
 
     // Update outputs
-    write_output_vals();
+
     update_inputs_buffer(inputs, N_INPUTS, &inputs_buffer);
     update_outputs_buffer(outputs, N_OUTPUTS, &outputs_buffer);
-
     // Reset timer
     reset_moving_average();
     esp_timer_start_once(timer_sensors_handle, sample_time);
@@ -240,15 +225,16 @@ void loop() {
   }
 
   pulse_counter();
-  if (PULSES_READY) {
-    Serial.print(counter);
-    Serial.print(", ");
+  if (VOLUMES_READY) {
+    
+    outputs[0].write_output();
     reset_pulse_counters();
-    Serial.println(pulses[0].value, 4);
-    update_inputs_buffer(pulses, N_PULSES, &pulses_buffer);
-    esp_timer_start_once(timer_pulses_handle, pulses_time);
-    PULSES_READY = false;
+    update_inputs_buffer(volumes, N_VOLUMES, &volumes_buffer);
+    
+    esp_timer_start_once(timer_volumes_handle, volumes_time);
+    VOLUMES_READY = false; 
   }
+
 }
 
 void moving_average(void) {
@@ -274,9 +260,9 @@ void reset_moving_average(void) {
 
 void pulse_counter(void) {
   /*
-    This pulses_counter is used to measure gas flow using the difference between p_final and p_initial.
+    This volumes_counter is used to measure gas flow using the difference between p_final and p_initial.
 
-    A pulse cycle goes from p_last (p_initial) to PULSES_PRESSURE_UB. When the pressure goes above the UB,
+    A pulse cycle goes from p_last (p_initial) to volumes_PRESSURE_UB. When the pressure goes above the UB,
     the difference between the current pressure (p_final) and p_last is added to the delta pressure
     accumulator (pulse[i].delta_pressure), then a solenoid is activated to reset the pressure,
     and p_last is updated
@@ -284,107 +270,54 @@ void pulse_counter(void) {
     A measurment cycle last 60 seconds by default. The reported value is the accumulated delt_pressure
     after the 60s have elapsed
   */
-  for (int i = 0; i < N_PULSES; i++) {
-    double pressure = (sensors.*pulses[i].read)(i);
-    if(!pulses[i].is_on){
+  for (int i = 0; i < N_VOLUMES; i++) {
+    float pressure = (sensors.*volumes[i].read)(i);
+    if(!volumes[i].is_on){
       if (pressure >= 11.40) {
-        counter = counter + 1;
-        Serial.print(pulses[i].last_pressure);
-        Serial.print(", ");
-        Serial.println(pressure);
-        pulses[i].delta_pressure += pressure - pulses[i].last_pressure;
-
-        ledcWrite(pulses[i].channel, 150);
-        pulses[i].is_on = true;
-        pulses[i].start_millis = millis();
+        volumes[i].delta_pressure += pressure - volumes[i].last_pressure;
+        ledcWrite(volumes[i].channel, 150);
+        volumes[i].is_on = true;
+        volumes[i].start_millis = millis();
       }
     }
-    if(pulses[i].is_on){
-      if(millis() - pulses[i].start_millis > 500){
-        pulses[i].last_pressure = (sensors.*pulses[i].read)(i);
-        ledcWrite(pulses[i].channel, 0);
-        pulses[i].is_on = false;
+    if(volumes[i].is_on){
+      if(millis() - volumes[i].start_millis > 500){
+        volumes[i].last_pressure = (sensors.*volumes[i].read)(i);
+        ledcWrite(volumes[i].channel, 0);
+        volumes[i].is_on = false;
       }
     }
   }
 }
 
 void reset_pulse_counters(void) {
-  for (int i = 0; i < N_PULSES; i++) {
-    pulses[i].value = pulses[i].delta_pressure;
-    pulses[i].delta_pressure = 0;
-    counter = 0;
+  for (int i = 0; i < N_VOLUMES; i++) {
+    volumes[i].value = volumes[i].delta_pressure;
+    volumes[i].delta_pressure = 0;
   }
 }
 
-double get_current(double voltage){
-  double current = (voltage - 2.5012) / -0.067;
+float get_current(float voltage){
+  float current = (voltage - 2.5012) / -0.067;
   return current;
 }
 
-double get_dissolved_oxygen(double voltage){
-  double dissolved_oxygen = 0.4558 * voltage;
+float get_dissolved_oxygen(float voltage){
+  float dissolved_oxygen = 0.4558 * voltage;
   return dissolved_oxygen;
 }
 
-double get_ph(double voltage){
-  double ph = 3.9811 * voltage - 3.5106;
+float get_ph(float voltage){
+  float ph = 3.9811 * voltage - 3.5106;
   return ph;
 }
 
-double get_temperature(double voltage){
-  double input_voltage = 3.3;
-  double resistor_reference = 10000; // Vaulue of the termistor reference resistor in series
-  double resistance = resistor_reference / ((input_voltage / voltage) - 1);
-  double temperature = (1 / ( 8.7561e-4 + 2.5343e-4*log(resistance) + 1.84499e-7*pow(log(resistance), 3) )) - 273.15;
+float get_temperature(float voltage){
+  float input_voltage = 3.3;
+  float resistor_reference = 10000; // Vaulue of the termistor reference resistor in series
+  float resistance = resistor_reference / ((input_voltage / voltage) - 1);
+  float temperature = (1 / ( 8.7561e-4 + 2.5343e-4*log(resistance) + 1.84499e-7*pow(log(resistance), 3) )) - 273.15;
   return temperature;
-}
-
-void write_output_vals(void) {
-  for (int i = 0; i < N_OUTPUTS; i++) {
-    switch (outputs[i].control_mode) {
-      case MANUAL:
-        outputs[i].value = outputs[i].manual_value;
-        break;
-
-      case TIMER:
-        outputs[i].delta_time = outputs[i].delta_time + 1;
-        if (outputs[i].delta_time > outputs[i].current_timer) {
-          if (outputs[i].is_on) {
-            outputs[i].is_on = false;
-          }
-          else {
-            outputs[i].is_on = true;
-          }
-          outputs[i].delta_time = 0;
-        }
-        if (outputs[i].is_on) {
-          outputs[i].current_timer = outputs[i].time_on;
-          outputs[i].value = outputs[i].manual_value;
-        }
-        else {
-          outputs[i].current_timer = outputs[i].time_off;
-          outputs[i].value = 0;
-        }
-        break;
-
-      case PID:
-        pid_filter[i] = 0.01 * (*outputs[i].input_val) + (1 - 0.01) * pid_filter[i];
-        all_pids[i].Compute();
-        outputs[i].value = pid_output[i];
-        break;
-
-      case ONOFF:
-        if ((*outputs[i].input_val) < outputs[i].input_val_lb) {
-          outputs[i].value = outputs[i].manual_value;
-        }
-        if ((*outputs[i].input_val) > outputs[i].input_val_ub) {
-          outputs[i].value = 0;
-        }
-        break;
-    }
-    ledcWrite(outputs[i].channel, outputs[i].value);
-  }
 }
 
 void send_board_info(void) {
@@ -396,8 +329,12 @@ void send_board_info(void) {
     slaves_input_info = slaves_input_info + "'" + slaves[i].name + "':[" + slaves[i].inputsInfo + "],";
   }
 
+  String this_outs = "";
+  for(int i=0; i<N_OUTPUTS; i++){
+    this_outs = this_outs + "(" + outputs[i].type + "," + outputs[i].channel + "),";
+  }
   String outputs_string = "'outs':{'" + ADDRESS + "':[" + get_outputs_info(outputs, N_OUTPUTS) + "]," + slaves_output_info + "}";
-  String inputs_string = "'ins':{'" + ADDRESS + "':[" + get_inputs_info(inputs, N_INPUTS) + get_inputs_info(pulses, N_PULSES) + "]," + slaves_input_info + "}";
+  String inputs_string = "'ins':{'" + ADDRESS + "':[" + get_inputs_info(inputs, N_INPUTS) + get_inputs_info(volumes, N_VOLUMES) + "]," + slaves_input_info + "}";
 
   String all_data_json = "{'address': '" + ADDRESS + "', 'samples_per_second': " + samples_per_second + ", ";
   all_data_json = all_data_json + outputs_string + ", " + inputs_string;
@@ -424,53 +361,22 @@ void parse_string(String input_string) {
         // GET_BOARD_INFO: "ADDR 0,!"
         send_board_info();
       }
-      //
-      // if (command == GET_OUTPUTS_INFO){
-      //   // GET_OUTPUTS_INFO: "ADDR 2,!"
-      //   String outputs_info = get_outputs_info(outputs, N_OUTPUTS) + "!";
-      //   Serial.println(outputs_info);
-      //   //write_to_master(outputs_info, transmit_pin);
-      // }
-      //
-      // if (command == GET_INPUTS_INFO){
-      //   // GET_INPUTS_INFO: "ADDR 3,!"
-      //   String inputs_info = get_inputs_info(inputs, N_INPUTS) + get_inputs_info(pulses, N_PULSES) + "!";
-      //   Serial.println(inputs_info);
-      //   //write_to_master(inputs_info, transmit_pin);
-      // }
-      //
-      // if (command == GET_OUTPUTS_DATA) {
-      //   // GET_OUTPUTS_DATA: "ADDR 4,!"
-      //   String data_string = outputs_buffer + "!";
-      //   Serial.println(data_string);
-      //   //write_to_master(data_string, transmit_pin);
-      // }
-      //
-      // if (command == GET_INPUTS_DATA) {
-      //   // GET_INPUTS_DATA: "ADDR 5,!"
-      //   String data_string = inputs_buffer + pulses_buffer + "!";
-      //   Serial.println(data_string);
-      //   //write_to_master(data_string, transmit_pin);
-      // }
-      //
-      if (command == GET_ALL_INPUTS) {
-        // GET_ALL_INPUTS: "ADDR 6,!"
-        String to_send_string = "{'" + ADDRESS + "':[" + inputs_buffer + pulses_buffer + "]}115,!";
+
+      if (command == GET_ALL_DATA) {
+        // GET_ALL_INPUTS: "ADDR 2,!"
+        String outputs_string = "'outs':[" + outputs_buffer + "],";
+        String inputs_string = "'ins':[" + inputs_buffer + volumes_buffer + "]";
+        String to_send_string = "{'" + ADDRESS + "':{" + outputs_string + inputs_string + "}}115,!";
         Serial.println(to_send_string);
         inputs_buffer = "";
-        pulses_buffer = "";
+        volumes_buffer = "";
       }
-      //
-      // if (command == GET_ALL_OUTPUTS) {
-      //   // GET_ALL_OUTPUTS: "ADDR 7,!"
-      //   send_output_data(ADDRESS, slaves, N_SLAVES, &incoming_message, &outputs_buffer);
-      //}
 
       if (command == TOGGLE_CONTROL_MODE) {
-        // MANUAL: "ADDR, 1,0,OUT_CHANNEL,PWM,!"
-        // TIMER:  "ADDR, 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
-        // PID:    "ADDR, 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
-        // ONOFF:  "ADDR, 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
+        // MANUAL: "ADDR 1,0,OUT_CHANNEL,PWM,!"
+        // TIMER:  "ADDR 1,1,OUT_CHANNEL,TIME_ON,TIME_OFF,PWM,!"
+        // PID:    "ADDR 1,2,OUT_CHANNEL,IN_CHANNEL,SETPOINT,!"
+        // ONOFF:  "ADDR 1,3,OUT_CHANNEL,IN_CHANNEL,LOWER_BOUND,UPPER_BOUND,PWM,!"
 
         lastcomma = firstcomma;
         nextcomma = input_string.indexOf(',', lastcomma + 1);
@@ -479,16 +385,13 @@ void parse_string(String input_string) {
         nextcomma = input_string.indexOf(',', lastcomma + 1);
         int out_channel = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
-        outputs[out_channel].control_mode = control_mode;
-
-        switch (outputs[out_channel].control_mode) {
+        switch (control_mode) {
           case MANUAL: {
               lastcomma = nextcomma;
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
-              outputs[out_channel].manual_value = value;
-              all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
+              outputs[out_channel].set_manual_output(value);
               Serial.println(ok_string);
               break;
             }
@@ -504,13 +407,7 @@ void parse_string(String input_string) {
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
-              outputs[out_channel].manual_value = value;
-              all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
-              outputs[out_channel].time_on = time_on;
-              outputs[out_channel].time_off = time_off;
-              outputs[out_channel].delta_time = 0;
-              outputs[out_channel].current_timer = outputs[out_channel].time_on;
-              outputs[out_channel].is_on = true;
+              outputs[out_channel].set_timer(time_on, time_off, value);
               Serial.println(ok_string);
               break;
             }
@@ -523,11 +420,8 @@ void parse_string(String input_string) {
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               float setpoint = input_string.substring(lastcomma + 1, nextcomma).toFloat();
 
-              all_pids[out_channel].SetMode(all_pids[out_channel].Control::automatic);
-              pid_setpoint[out_channel] = setpoint;
-
-              outputs[out_channel].input_val = &inputs[in_channel].value;
-              pid_filter[out_channel] = inputs[in_channel].value;
+              outputs[out_channel].set_pid(&inputs[in_channel].value, setpoint);
+              outputs[out_channel].initialize_pid();
               Serial.println(ok_string);
               break;
             }
@@ -546,12 +440,7 @@ void parse_string(String input_string) {
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
-              outputs[out_channel].manual_value = value;
-              outputs[out_channel].input_val_lb = lower_bound;
-              outputs[out_channel].input_val_ub = upper_bound;
-              all_pids[out_channel].SetMode(all_pids[out_channel].Control::manual);
-
-              outputs[out_channel].input_val = &inputs[in_channel].value;
+              outputs[out_channel].set_onoff(&inputs[in_channel].value, lower_bound, upper_bound, value);
               Serial.println(ok_string);
               break;
             }
@@ -563,6 +452,7 @@ void parse_string(String input_string) {
       for (int i = 0; i < N_SLAVES; i++){
         esp_now_send(slaves[i].broadcastAddress, (uint8_t *) &outgoing_message, sizeof(outgoing_message));
       }
+      Serial.println(ok_string);
     }
     new_command = false;
   }

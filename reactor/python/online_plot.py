@@ -26,7 +26,7 @@ class Plotter:
         self.start_time = self.get_startime()
 
     def connect_to_db(self, DATABASE_PATH):
-        return Handle.Database(DATABASE_PATH="database.db")
+        return Handle.Database(DATABASE_PATH)
 
     def get_startime(self):
         query_str = f"SELECT * FROM {self.experiment} WHERE ROWID = 1"
@@ -162,12 +162,15 @@ class Plotter:
 
 
 if __name__ == "__main__":
-    plotter = Plotter(experiment_name="test", time_units="seconds")
+    plotter = Plotter(
+        experiment_name="test", DATABASE_PATH="test_.db",
+        time_units="minutes"
+    )
 
-    plotter.set_ax_00_vars(["temperature_0", "temperature_1"])
-    plotter.set_ax_01_vars(["M0pwm_0"])
-    plotter.set_ax_10_vars(["dissolved_oxygen"])
-    plotter.set_ax_11_vars(["ph"])
+    plotter.set_ax_00_vars(["M0_3"])
+    plotter.set_ax_01_vars(["M0_temperature_0"])
+    plotter.set_ax_10_vars(["M1_1"])
+    plotter.set_ax_11_vars(["M1_0"])
 
     figure, grid = plotter.create_figure()
     plotter.create_axes(figure, grid)

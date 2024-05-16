@@ -13,15 +13,19 @@ import termios
 import Board
 import Handle
 
-sqlite_db = Handle.Database(DATABASE_PATH="database.db")
-board = Board.Board(address="M0", baud_rate=230400,
-                    port_name="/dev/ttyUSB0")
+sqlite_db = Handle.Database(DATABASE_PATH="test_.db")
 
-experiment = Handle.Experiment(name="test7", sqlite_db=sqlite_db,
-                               board=board)
+board_0 = Board.Board(address="M0", baud_rate=230400,
+                      port_name="/dev/ttyUSB0")
+board_1 = Board.Board(address="M1", baud_rate=230400,
+                      port_name="/dev/ttyUSB1")
+boards = [board_0, board_1]
+experiment = Handle.Experiment(name="test", sqlite_db=sqlite_db,
+                               boards=boards)
+for board in boards:
+    board.start_config_observer()
 
-board.start_config_observer()
-time_between_samples = 1
+time_between_samples = 0.25
 last_time = time.time()
 
 while True:
@@ -29,15 +33,21 @@ while True:
         current_time = time.time()
         if (current_time - last_time) >= time_between_samples:
             last_time = current_time
-            data_dict = board.read_data()
+
+            data_dict = {}
+            for board in boards:
+                data_dict = data_dict | board.read_data()
+
             date = datetime.now()
+
             try:
                 experiment.save_data(
                     time=date, data_dict=data_dict
                 )
             except TypeError:
                 print(data_dict)
-        board.update_configuration()
+        for board in boards:
+            board.update_configuration()
 
     except KeyboardInterrupt:
         board.config_observer.stop()
