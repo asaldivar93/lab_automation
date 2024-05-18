@@ -1,17 +1,15 @@
 #include <Arduino.h>
-#include <esp_now.h>
-#include <WiFi.h>
 
 #include "bioreactify.h"
 #include "comms_handle.h"
 
 #define N_OUTPUTS 5
-#define N_INPUTS  8
+#define N_INPUTS  0
 #define N_VOLUMES  1
-#define N_SLAVES  1
+#define N_SLAVES  0
 
 // Serial info
-String ADDRESS = "M0";
+String ADDRESS = "M1";
 int transmit_pin = 4;
 boolean new_command = false;
 String input_string = "";
@@ -22,17 +20,11 @@ String inputs_buffer = "";
 String volumes_buffer = "";
 
 // Config Data
-Slave slaves[N_SLAVES] =
-{ {"S1", {0x58, 0xBF, 0x25, 0x36, 0x78, 0x94}, "", "('stp',0),('stp',1),('stp',2)"} };
+Slave slaves[N_SLAVES];
 
-Input inputs[N_INPUTS] =
-{ {ADDRESS, "adc", 0, "current"}, {ADDRESS, "adc", 1, "dissolved_oxygen"},
-  {ADDRESS, "adc", 2, "ph"}, {ADDRESS, "adc", 3, "temperature_0"},
-  {ADDRESS, "adc", 4, "temperature_1"}, {ADDRESS, "adc", 5, "dump_2"},
-  {ADDRESS, "adc", 6, "dump_3"}, {ADDRESS, "adc", 7, "dump_4"}
-};
+Input inputs[N_INPUTS];
 
-Input volumes[N_VOLUMES] = { {ADDRESS, "vol", 8, "vol_ml_per_10s", PIN_CH5} };
+Input volumes[N_VOLUMES] = { {ADDRESS, "vol", 0, "vol_ml_per_10s", PIN_CH5} };
 
 Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
 Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
@@ -53,7 +45,7 @@ int sample_number;
 uint32_t samples_per_second = 4;
 uint32_t one_second = 1000000;
 uint32_t sample_time = one_second / samples_per_second;
-uint32_t volumes_time = 1 * one_second;
+uint32_t volumes_time = 20 * one_second;
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
@@ -81,40 +73,11 @@ void serial_comms_code(void *parameters) {
   }
 }
 
-// ESPnow
-MessageSlaves incoming_message[N_SLAVES];
-MessageSlaves buffer_message;
-SimpleMessage outgoing_message;
-bool waiting;
-esp_now_peer_info_t esp_slaves[N_SLAVES];
-
-void on_message_sent(const uint8_t *mac_address, esp_now_send_status_t status){
-  if (status == 0){
-    waiting = false;
-  }
-}
-
-void on_message_recv(const uint8_t *mac_address, const uint8_t *inMessage, int size){
-  waiting = true;
-  memcpy(&buffer_message, inMessage, size);
-  String inputString = parse_serial(buffer_message.message, &new_command);
-  new_command = false;
-}
 
 // Inint functions
 void init_comms(void){
-  Wire.begin();
   Serial.begin(230400);
-  WiFi.mode(WIFI_STA);
-  esp_now_init();
-  esp_now_register_recv_cb(on_message_recv);
-  esp_now_register_send_cb(on_message_sent);
-  for(int i=0; i<N_SLAVES; i++){
-    memcpy(esp_slaves[i].peer_addr, slaves[i].broadcastAddress, 6);
-    esp_slaves[i].channel = i;
-    esp_slaves[i].encrypt = false;
-    esp_now_add_peer(&esp_slaves[i]);
-  }
+  Wire.begin();
   xTaskCreatePinnedToCore(serial_comms_code, "serial_comms", 10000, NULL, 0, &serial_comms, 0);
 }
 
@@ -161,30 +124,9 @@ void setup() {
   sensors.set_ref_voltage(3.3);
   sensors.set_mprls_range(0, 25);
   // Set readings
-  inputs[0].read = &Sensors::read_adc;
-  inputs[1].read = &Sensors::read_adc;
-  inputs[2].read = &Sensors::read_adc;
-  inputs[3].read = &Sensors::read_adc;
-  inputs[4].read = &Sensors::read_adc;
-  inputs[5].read = &Sensors::read_adc;
-  inputs[6].read = &Sensors::read_adc;
-  inputs[7].read = &Sensors::read_adc;
   volumes[0].read = &Sensors::read_mprls;
 
   // Initialize measurments
-  moving_average();
-  get_moving_average();
-  inputs[0].value = get_current(analog[0]);
-  inputs[1].value = get_dissolved_oxygen(analog[1]);
-  inputs[2].value = get_ph(analog[2]);
-  inputs[3].value = get_temperature(analog[3]);
-  inputs[4].value = get_temperature(analog[4]);
-  inputs[5].value = analog[5];
-  inputs[6].value = analog[6];
-  inputs[7].value = analog[7];
-  reset_moving_average();
-  delay(100);
-
   for(int i=0; i<N_VOLUMES; i++){
     volumes[i].last_pressure = (sensors.*volumes[i].read)(i);
   }
@@ -197,17 +139,8 @@ void loop() {
   if (DATA_READY) {
     // Transform data
     get_moving_average();
-
     // ------------ Modify Configuration -------------- //
-    inputs[0].value = get_current(analog[0]);
-    inputs[1].value = get_dissolved_oxygen(analog[1]);
-    inputs[2].value = get_ph(analog[2]);
-    inputs[3].value = get_temperature(analog[3]);
-    inputs[4].value = get_temperature(analog[4]);
-    inputs[5].value = get_temperature(analog[5]);
-    inputs[6].value = get_temperature(analog[6]);
-    inputs[7].value = get_temperature(analog[7]);
-
+    outputs[0].write_output();
     outputs[1].write_output();
     outputs[2].write_output();
     outputs[3].write_output();
@@ -226,7 +159,6 @@ void loop() {
 
   pulse_counter();
   if (VOLUMES_READY) {
-    outputs[0].write_output();
     for (int i = 0; i < N_VOLUMES; i++) {
       volumes[i].value = get_volume(volumes[i].delta_pressure);
     }
@@ -454,13 +386,6 @@ void parse_string(String input_string) {
             }
         }
       }
-    }
-    else {
-      strcpy(outgoing_message.message, input_string.c_str());
-      for (int i = 0; i < N_SLAVES; i++){
-        esp_now_send(slaves[i].broadcastAddress, (uint8_t *) &outgoing_message, sizeof(outgoing_message));
-      }
-      Serial.println(ok_string);
     }
     new_command = false;
   }

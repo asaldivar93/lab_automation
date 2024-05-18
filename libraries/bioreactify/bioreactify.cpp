@@ -296,25 +296,26 @@ float Output::compute_pid(float input) {
   _integral_sum += i_term;
   _integral_sum = constrain(_integral_sum, _output_min, _output_max);
   output = constrain(_integral_sum + p_term + d_term, _output_min, _output_max);
-  
+
   _last_error = error;
   _last_time = now;
-  
+
   return output;
 }
 
-void Output::set_sample_time(uint32_t sample_time){
-  _sample_time = sample_time;
+void Output::set_sample_time_us(uint32_t sample_time_us){
+  _sample_time_us = sample_time_us;
+  float _sample_time_s = (float) _sample_time_us / 1000000;
 }
 
 void Output::set_gh_filter(float alpha){
   _alpha = alpha;
 }
 
-void Output::set_pid_tunings(float kp, float ki, float kd){
-  _kp = kp;
-  _ki = ki;
-  _kd = kd;
+void Output::set_pid_tunings(float Kp, float Ki, float Kd){
+  _kp = Kp;
+  _ki = Ki * _sample_time_s;
+  _kd = Kd / _sample_time_s;
 }
 
 void Output::set_output_limits(float min, float max){
@@ -323,7 +324,7 @@ void Output::set_output_limits(float min, float max){
 }
 
 void Output::initialize_pid(){
-  _last_time = micros() - _sample_time;
+  _last_time = micros() - _sample_time_us;
   _last_error = 0;
   _integral_sum = 0;
   _filtered_input = (*_input_value);

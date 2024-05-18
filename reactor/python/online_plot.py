@@ -163,19 +163,19 @@ class Plotter:
 
 if __name__ == "__main__":
     plotter = Plotter(
-        experiment_name="test", DATABASE_PATH="test_.db",
+        experiment_name="salida_h2_o2_C1", DATABASE_PATH="database.db",
         time_units="minutes"
     )
 
     plotter.set_ax_00_vars(["M0_3"])
     plotter.set_ax_01_vars(["M0_temperature_0"])
-    plotter.set_ax_10_vars(["M1_1"])
-    plotter.set_ax_11_vars(["M1_0"])
+    plotter.set_ax_10_vars(["M1_vol_ml_per_10s"])
+    plotter.set_ax_11_vars(["M0_dissolved_oxygen"])
 
     figure, grid = plotter.create_figure()
     plotter.create_axes(figure, grid)
 
     ani = FuncAnimation(figure, plotter.update,
-                        init_func=plotter.init, interval=1000 * 1,
+                        init_func=plotter.init, interval=1000 * 10,
                         cache_frame_data=False)
     plot.show()

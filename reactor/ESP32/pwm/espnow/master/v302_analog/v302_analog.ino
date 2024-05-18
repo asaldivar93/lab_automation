@@ -6,8 +6,8 @@
 #include "comms_handle.h"
 
 #define N_OUTPUTS 5
-#define N_INPUTS  8
-#define N_VOLUMES  1
+#define N_INPUTS  5
+#define N_VOLUMES 0
 #define N_SLAVES  1
 
 // Serial info
@@ -28,11 +28,10 @@ Slave slaves[N_SLAVES] =
 Input inputs[N_INPUTS] =
 { {ADDRESS, "adc", 0, "current"}, {ADDRESS, "adc", 1, "dissolved_oxygen"},
   {ADDRESS, "adc", 2, "ph"}, {ADDRESS, "adc", 3, "temperature_0"},
-  {ADDRESS, "adc", 4, "temperature_1"}, {ADDRESS, "adc", 5, "dump_2"},
-  {ADDRESS, "adc", 6, "dump_3"}, {ADDRESS, "adc", 7, "dump_4"}
+  {ADDRESS, "adc", 4, "temperature_1"}
 };
 
-Input volumes[N_VOLUMES] = { {ADDRESS, "vol", 8, "vol_ml_per_10s", PIN_CH5} };
+Input volumes[N_VOLUMES]; // = { {ADDRESS, "vol", 8, "vol_ml_per_10s", PIN_CH5} };
 
 Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
 Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
@@ -53,7 +52,7 @@ int sample_number;
 uint32_t samples_per_second = 4;
 uint32_t one_second = 1000000;
 uint32_t sample_time = one_second / samples_per_second;
-uint32_t volumes_time = 1 * one_second;
+uint32_t volumes_time = 20 * one_second;
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
@@ -159,17 +158,13 @@ void setup() {
   sensors.begin(CS0);
   sensors.set_spi_speed(1000000);
   sensors.set_ref_voltage(3.3);
-  sensors.set_mprls_range(0, 25);
+
   // Set readings
   inputs[0].read = &Sensors::read_adc;
   inputs[1].read = &Sensors::read_adc;
   inputs[2].read = &Sensors::read_adc;
   inputs[3].read = &Sensors::read_adc;
   inputs[4].read = &Sensors::read_adc;
-  inputs[5].read = &Sensors::read_adc;
-  inputs[6].read = &Sensors::read_adc;
-  inputs[7].read = &Sensors::read_adc;
-  volumes[0].read = &Sensors::read_mprls;
 
   // Initialize measurments
   moving_average();
@@ -179,16 +174,17 @@ void setup() {
   inputs[2].value = get_ph(analog[2]);
   inputs[3].value = get_temperature(analog[3]);
   inputs[4].value = get_temperature(analog[4]);
-  inputs[5].value = analog[5];
-  inputs[6].value = analog[6];
-  inputs[7].value = analog[7];
   reset_moving_average();
   delay(100);
 
   for(int i=0; i<N_VOLUMES; i++){
     volumes[i].last_pressure = (sensors.*volumes[i].read)(i);
   }
-
+  
+  // Initial Setup
+  // outputs[1].set_timer(5,60,125);
+  outputs[3].set_pid(&inputs[3].value, 48);
+  outputs[3].set_output_limits(0, 240);
   // ------------ Modify Configuration -------------- //
 }
 
@@ -197,16 +193,12 @@ void loop() {
   if (DATA_READY) {
     // Transform data
     get_moving_average();
-
     // ------------ Modify Configuration -------------- //
-    inputs[0].value = get_current(analog[0]);
+    inputs[0].value = analog[0];
     inputs[1].value = get_dissolved_oxygen(analog[1]);
     inputs[2].value = get_ph(analog[2]);
     inputs[3].value = get_temperature(analog[3]);
     inputs[4].value = get_temperature(analog[4]);
-    inputs[5].value = get_temperature(analog[5]);
-    inputs[6].value = get_temperature(analog[6]);
-    inputs[7].value = get_temperature(analog[7]);
 
     outputs[1].write_output();
     outputs[2].write_output();
@@ -311,12 +303,12 @@ float get_current(float voltage){
 }
 
 float get_dissolved_oxygen(float voltage){
-  float dissolved_oxygen = 0.4558 * voltage;
+  float dissolved_oxygen = 100 * 0.6844 * voltage;
   return dissolved_oxygen;
 }
 
 float get_ph(float voltage){
-  float ph = 3.9811 * voltage - 3.5106;
+  float ph = 6.006 * voltage - 3.5108;
   return ph;
 }
 

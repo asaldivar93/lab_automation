@@ -13,14 +13,14 @@ import termios
 import Board
 import Handle
 
-sqlite_db = Handle.Database(DATABASE_PATH="test_.db")
+sqlite_db = Handle.Database(DATABASE_PATH="database.db")
 
 board_0 = Board.Board(address="M0", baud_rate=230400,
                       port_name="/dev/ttyUSB0")
 board_1 = Board.Board(address="M1", baud_rate=230400,
                       port_name="/dev/ttyUSB1")
 boards = [board_0, board_1]
-experiment = Handle.Experiment(name="test", sqlite_db=sqlite_db,
+experiment = Handle.Experiment(name="salida_h2_o2_C1", sqlite_db=sqlite_db,
                                boards=boards)
 for board in boards:
     board.start_config_observer()

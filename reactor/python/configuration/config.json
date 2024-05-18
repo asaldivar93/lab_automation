@@ -1,10 +1,10 @@
 {
-  "M0_0": {"mode": "ONOFF", "value": 255,
+  "M0_0": {"mode": "ONOFF", "value": 0,
            "time_on": null, "time_off": null,
            "variable": "M0_dissolved_oxygen", "setpoint": null,
-           "lower_bound": 1.4, "upper_bound": 1.41
+           "lower_bound": 1.5, "upper_bound": 1.51
           },
-  "M0_1": {"mode": "ONOFF", "value": 125,
+  "M0_1": {"mode": "MANUAL", "value": 0,
            "time_on": 15, "time_off": 300,
            "variable": "M0_dissolved_oxygen", "setpoint": null,
            "lower_bound": 1.5, "upper_bound": 1.51
@@ -16,7 +16,7 @@
           },
   "M0_3": {"mode": "PID", "value": 0,
            "time_on": null, "time_off": null,
-           "variable": "M0_temperature_0", "setpoint": 28,
+           "variable": "M0_temperature_0", "setpoint": 48,
            "lower_bound": null, "upper_bound": null
           },
   "M0_4": {"mode": "MANUAL", "value": 0,
@@ -24,7 +24,7 @@
            "variable": null, "setpoint": null,
            "lower_bound": null, "upper_bound": null
           },
-  "S1_1": {"mode": "MANUAL", "value": 30,
+  "S1_1": {"mode": "MANUAL", "value": 0,
   		   "time_on": null, "time_off": null,
   		   "variable": null, "setpoint": null,
   		   "lower_bound": null, "upper_bound": null

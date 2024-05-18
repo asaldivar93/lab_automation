@@ -108,11 +108,11 @@ public:
 
   //----PID-----//
   float compute_pid(float input);
-  void set_sample_time(uint32_t sample_time);
+  void set_sample_time_us(uint32_t sample_time_us);
   void set_gh_filter(float alpha);
-  void set_pid_tunings(float kp, float ki, float kd);
+  void set_pid_tunings(float Kp, float Ki, float Kd);
   void set_output_limits(float min, float max);
-  void initialize_pid();
+  void initialize_pid(void);
 
   int channel;
   int pin;
@@ -134,12 +134,15 @@ private:
 
   //-----PID------//
   float _setpoint;
-  float _alpha, _filtered_input;
-  uint32_t _sample_time;
+  float _alpha = 0.01;
+  float _filtered_input;
+  uint32_t _sample_time_us = 250000;
+  float _samples_time_s = 0.25;
   float _kp, _ki, _kd;
   float _integral_sum;
   float _last_error, _last_time;
-  float _output_min, _output_max;
+  float _output_min = 0;
+  float _output_max = 255;
 };
 
 
