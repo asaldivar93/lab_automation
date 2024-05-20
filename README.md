@@ -17,8 +17,8 @@ Output outputs[N_OUTPUTS] = {CH_0, CH_1, CH_2, CH_3, CH_4, CH_5};
 Channels can be controled in 4 different modes: {MANUAL, TIMER, PID, ONOFF}. You can initialize this control mode through setter functions.
 
 ```C++
-Output::set_manual_output(int value)
-Output::set_timer(int time_on, int time_off, int value)
+Output::set_manual_output(int value);
+Output::set_timer(int time_on, int time_off, int value);
 Output::set_pid(float *input_value, float setpoint);
 Output::set_onoff(float *input_value, int lb, int ub, int value);
 ```
@@ -76,9 +76,9 @@ The default values were tuned to control the temperature of a water reservoir us
 These parameters are initialized through setter functions:
 
 ```C++
-Output::set_sample_time_us(uint32_t sample_time_us)
-Output::set_pid_tunings(float Kp, float Ki, float Kd)
-Output::set_output_limits(float min, float max)
+Output::set_sample_time_us(uint32_t sample_time_us);
+Output::set_pid_tunings(float Kp, float Ki, float Kd);
+Output::set_output_limits(float min, float max);
 Output::set_gh_filter(float alpha);
 ```
 example:

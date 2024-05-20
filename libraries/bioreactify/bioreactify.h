@@ -54,6 +54,8 @@ public:
   float read_mprls(uint8_t channel);
   void set_mprls_range(float p_min, float p_max);
 
+  float read_sen0343_diffpressure(uint8_t channel)
+
 private:
   // MCP3208
   uint8_t  _dataIn;
@@ -82,9 +84,11 @@ private:
   uint8_t _o2_data_register = 0x03;
   float _cal = 20.9 / 100;
 
+  // SEN0343 Differential pressure sensor
+  uint8_t _SEN0343_ADDRESS=0x00;
+
   // MPRLS Pressure Sensor
   uint8_t _MPRLS_DEFAULT_ADDRESS=0x18;
-  uint8_t _request[3] = {0xAA, 0x00, 0x00};
   float _p_min = 0;
   float _p_max = 25;
   float _out_min=1677722;
