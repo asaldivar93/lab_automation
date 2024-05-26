@@ -195,34 +195,23 @@ float Sensors::read_sen0546_humidity(uint8_t channel){
 }
 
 float Sensors::read_sen0343_diffpressure(uint8_t channel){
-  uint8_t _config = {0xaa,0x00,0x80};
-  uint8_t _request=0x01;
+  uint8_t _request = {0xaa,0x00,0x80};
   uint8_t _size = 7;
   uint8_t _data[_size];
 
   Wire.beginTransmission(_SEN0343_ADDRESS);
-  int _status = Wire.write(_config, 3);
+  int _status = Wire.write(_request, 3);
   _status = Wire.endTransmission();
   if(_status != 0){
     return 0;
   }
-  Serial.println("1");
-  delay(30);
-
-  Wire.beginTransmission(_SEN0343_ADDRESS);
-  int _status = Wire.write(_request);
-  _status = Wire.endTransmission();
-  if(_status != 0){
-    return 0;
-  }
-  Serial.println("2");
 
   delay(10);
   Wire.requestFrom(_SEN0343_ADDRESS, _size);
   for(int i=0; i<_size; i++){
     _data[i] = Wire.read();
   }
-  uint16_t _pressure_data = (data[1] << 8) + data[2];
+  uint16_t _pressure_data = (_data[1] << 8) + _data[2];
   _pressure_data = _pressure_data >> 2;
   float _diff_pressure = ((500 - (-500)) / 16384.0) * (float) _pressure_data + (-500);
   return _diff_pressure;

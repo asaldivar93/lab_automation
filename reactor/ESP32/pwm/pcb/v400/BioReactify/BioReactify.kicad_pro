@@ -179,7 +179,8 @@
       "track_widths": [
         0.0,
         0.5,
-        2.0
+        2.0,
+        2.2
       ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
@@ -920,12 +921,12 @@
       "Raíz"
     ],
     [
-      "50601876-fc53-4e1f-9ab9-278629234a85",
-      "analogs"
-    ],
-    [
       "93787006-acae-41b1-bf89-2f149b3d5be6",
       "i2c"
+    ],
+    [
+      "31069713-233f-4c9d-9e9d-ccd69244caa1",
+      "adc0"
     ]
   ],
   "text_variables": {}

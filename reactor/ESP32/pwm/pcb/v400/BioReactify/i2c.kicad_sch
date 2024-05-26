@@ -2370,16 +2370,16 @@
 		(uuid "f53a2cfe-70de-459b-ab0b-02c2d1733e39")
 	)
 	(symbol
-		(lib_id "power:+3.3V")
-		(at 50.8 46.99 270)
+		(lib_id "power:GND")
+		(at 50.8 62.23 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "02fcc0e1-26e5-4f19-a585-efcafce25af1")
-		(property "Reference" "#PWR037"
-			(at 46.99 46.99 0)
+		(uuid "03f36077-72ec-417b-892d-8dea550f2d1a")
+		(property "Reference" "#PWR075"
+			(at 57.15 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2387,17 +2387,17 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "+3.3V"
-			(at 53.34 46.99 90)
+		(property "Value" "GND"
+			(at 53.848 62.23 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" ""
-			(at 50.8 46.99 0)
+			(at 50.8 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2406,7 +2406,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 50.8 46.99 0)
+			(at 50.8 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2414,8 +2414,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 50.8 46.99 0)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 50.8 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2424,12 +2424,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "1b88578d-118b-40e0-a4d0-9aa4a1ced87f")
+			(uuid "c2271e27-5102-4f2a-a587-49604fae03f2")
 		)
 		(instances
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR037")
+					(reference "#PWR075")
 					(unit 1)
 				)
 			)
@@ -2502,16 +2502,16 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 78.74 49.53 90)
+		(lib_id "power:+3.3V")
+		(at 78.74 64.77 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "0d6868ea-b1ad-4aad-b857-8bfd7ddf9837")
-		(property "Reference" "#PWR064"
-			(at 85.09 49.53 0)
+		(uuid "1225b361-ade2-4e3f-bd26-f89185e4907f")
+		(property "Reference" "#PWR077"
+			(at 74.93 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2519,17 +2519,17 @@
 				(hide yes)
 			)
 		)
-		(property "Value" "GND"
-			(at 81.788 49.53 90)
+		(property "Value" "+3.3V"
+			(at 81.28 64.77 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify right)
+				(justify left)
 			)
 		)
 		(property "Footprint" ""
-			(at 78.74 49.53 0)
+			(at 78.74 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2538,7 +2538,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 78.74 49.53 0)
+			(at 78.74 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2546,8 +2546,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 78.74 49.53 0)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 78.74 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2556,12 +2556,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "741870b9-6260-4761-a1cb-6a542ef62f78")
+			(uuid "b1acc307-3cfe-4709-bf7a-99985e5f6bfe")
 		)
 		(instances
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR064")
+					(reference "#PWR077")
 					(unit 1)
 				)
 			)
@@ -2899,6 +2899,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 78.74 46.99 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "30740a4f-c68d-4fa1-be80-2c170dc97d17")
+		(property "Reference" "#PWR050"
+			(at 85.09 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 81.788 46.99 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 78.74 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 78.74 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 78.74 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "f4fcbbd1-37be-4d42-8c70-120aede14802")
+		)
+		(instances
+			(project "BioReactify"
+				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
+					(reference "#PWR050")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector:Conn_01x04_Pin")
 		(at 43.18 59.69 0)
 		(unit 1)
@@ -2967,72 +3033,6 @@
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
 					(reference "J13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 50.8 64.77 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "377f5e68-d6ee-4bde-a3ba-ae2a291d210c")
-		(property "Reference" "#PWR076"
-			(at 57.15 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 53.848 64.77 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 50.8 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 50.8 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 50.8 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "4b5b3d7f-2788-4098-b63d-bcc1f892bdf9")
-		)
-		(instances
-			(project "BioReactify"
-				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR076")
 					(unit 1)
 				)
 			)
@@ -3247,6 +3247,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 50.8 49.53 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "3ec9f90f-23cc-45c1-8ebf-74f583f215c8")
+		(property "Reference" "#PWR037"
+			(at 46.99 49.53 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 53.34 49.53 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 50.8 49.53 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 49.53 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 50.8 49.53 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "4cb1d369-cb70-4acc-86ed-eb792603da88")
+		)
+		(instances
+			(project "BioReactify"
+				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
+					(reference "#PWR037")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_US")
 		(at 170.18 76.2 270)
 		(unit 1)
@@ -3315,15 +3381,15 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 50.8 49.53 90)
+		(at 50.8 46.99 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "585f75b1-3acb-4ff4-aeee-f227cbb8d492")
-		(property "Reference" "#PWR051"
-			(at 57.15 49.53 0)
+		(uuid "66d84876-1155-42b6-b65a-2df52044600e")
+		(property "Reference" "#PWR065"
+			(at 57.15 46.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3332,7 +3398,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 53.848 49.53 90)
+			(at 53.848 46.99 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3341,7 +3407,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 50.8 49.53 0)
+			(at 50.8 46.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3350,7 +3416,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 50.8 49.53 0)
+			(at 50.8 46.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3359,7 +3425,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 50.8 49.53 0)
+			(at 50.8 46.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3368,12 +3434,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "1b916f2a-b961-4aea-8094-54b335d36777")
+			(uuid "a7db13ee-4e3d-4965-b973-1aeb34d6a5cd")
 		)
 		(instances
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR051")
+					(reference "#PWR065")
 					(unit 1)
 				)
 			)
@@ -3514,15 +3580,15 @@
 	)
 	(symbol
 		(lib_id "power:+3.3V")
-		(at 78.74 62.23 270)
+		(at 50.8 64.77 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "814786be-1055-4d1b-898e-336a35ef1db7")
-		(property "Reference" "#PWR075"
-			(at 74.93 62.23 0)
+		(uuid "87167833-b88e-462e-b27f-642c261ef92e")
+		(property "Reference" "#PWR076"
+			(at 46.99 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3531,7 +3597,7 @@
 			)
 		)
 		(property "Value" "+3.3V"
-			(at 81.28 62.23 90)
+			(at 53.34 64.77 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3540,7 +3606,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 78.74 62.23 0)
+			(at 50.8 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3549,7 +3615,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 78.74 62.23 0)
+			(at 50.8 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3558,7 +3624,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 78.74 62.23 0)
+			(at 50.8 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3567,12 +3633,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "7c48b5f7-b978-49c6-aa8c-fdb86ac50a8e")
+			(uuid "8143ae43-70c3-4039-9dfa-a755b85545bd")
 		)
 		(instances
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR075")
+					(reference "#PWR076")
 					(unit 1)
 				)
 			)
@@ -3846,6 +3912,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 78.74 62.23 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "9d2d12df-bb94-4912-8204-710e3aface65")
+		(property "Reference" "#PWR0102"
+			(at 85.09 62.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 81.788 62.23 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 78.74 62.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 78.74 62.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 78.74 62.23 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "8dd0162d-1dcd-4316-829c-c352b9c36d1d")
+		)
+		(instances
+			(project "BioReactify"
+				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
+					(reference "#PWR0102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_US")
 		(at 151.13 60.96 270)
 		(unit 1)
@@ -3974,72 +4106,6 @@
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
 					(reference "R33")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 78.74 64.77 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "a042ac45-8ce4-430c-be6e-4e6077ca2b07")
-		(property "Reference" "#PWR077"
-			(at 85.09 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 81.788 64.77 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 78.74 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 78.74 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 78.74 64.77 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "5d9c3a32-26ac-4bbe-8e16-5184375f5169")
-		)
-		(instances
-			(project "BioReactify"
-				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR077")
 					(unit 1)
 				)
 			)
@@ -4319,72 +4385,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3.3V")
-		(at 78.74 46.99 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "bbede3bc-64f9-49ca-b38a-912a6aeff171")
-		(property "Reference" "#PWR050"
-			(at 74.93 46.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 81.28 46.99 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" ""
-			(at 78.74 46.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 78.74 46.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 78.74 46.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "24fcd78f-e918-4eda-a456-142bfb143d85")
-		)
-		(instances
-			(project "BioReactify"
-				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR050")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_US")
 		(at 170.18 60.96 270)
 		(unit 1)
@@ -4653,15 +4653,15 @@
 	)
 	(symbol
 		(lib_id "power:+3.3V")
-		(at 50.8 62.23 270)
+		(at 78.74 49.53 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(uuid "dded34c7-5dc0-4aa7-b066-5c8411f06772")
-		(property "Reference" "#PWR065"
-			(at 46.99 62.23 0)
+		(uuid "debfee3b-bcc0-4d51-98ac-f7bf12af277c")
+		(property "Reference" "#PWR064"
+			(at 74.93 49.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4670,7 +4670,7 @@
 			)
 		)
 		(property "Value" "+3.3V"
-			(at 53.34 62.23 90)
+			(at 81.28 49.53 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4679,7 +4679,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 50.8 62.23 0)
+			(at 78.74 49.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4688,7 +4688,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 50.8 62.23 0)
+			(at 78.74 49.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4697,7 +4697,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 50.8 62.23 0)
+			(at 78.74 49.53 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4706,12 +4706,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "c1ff1163-7e8e-4397-9c74-73b239950032")
+			(uuid "b75299ea-3de6-4da1-9e2c-799a7ef4e614")
 		)
 		(instances
 			(project "BioReactify"
 				(path "/f275995d-e5b5-425a-b4cf-d04224d3feca/93787006-acae-41b1-bf89-2f149b3d5be6"
-					(reference "#PWR065")
+					(reference "#PWR064")
 					(unit 1)
 				)
 			)

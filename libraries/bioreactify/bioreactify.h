@@ -54,7 +54,7 @@ public:
   float read_mprls(uint8_t channel);
   void set_mprls_range(float p_min, float p_max);
 
-  float read_sen0343_diffpressure(uint8_t channel)
+  float read_sen0343_diffpressure(uint8_t channel);
 
 private:
   // MCP3208
