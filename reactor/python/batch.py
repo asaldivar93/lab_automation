@@ -15,17 +15,15 @@ import Handle
 
 sqlite_db = Handle.Database(DATABASE_PATH="database.db")
 
-board_0 = Board.Board(address="M0", baud_rate=230400,
-                      port_name="/dev/ttyUSB0")
-board_1 = Board.Board(address="M1", baud_rate=230400,
-                      port_name="/dev/ttyUSB1")
+board_0 = Board.Board("M0", baud_rate=230400, port_name="/dev/ttyUSB0")
+board_1 = Board.Board(address="M1", baud_rate=230400, port_name="/dev/ttyUSB1")
 boards = [board_0, board_1]
-experiment = Handle.Experiment(name="salida_h2_o2_C1", sqlite_db=sqlite_db,
+experiment = Handle.Experiment(name="boletito_2000", sqlite_db=sqlite_db,
                                boards=boards)
 for board in boards:
     board.start_config_observer()
 
-time_between_samples = 0.25
+time_between_samples = 1
 last_time = time.time()
 
 while True:

@@ -52,7 +52,7 @@ int sample_number;
 uint32_t samples_per_second = 4;
 uint32_t one_second = 1000000;
 uint32_t sample_time = one_second / samples_per_second;
-uint32_t volumes_time = 20 * one_second;
+uint32_t volumes_time = 0.5 * one_second;
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
@@ -174,6 +174,7 @@ void setup() {
   inputs[2].value = get_ph(analog[2]);
   inputs[3].value = get_temperature(analog[3]);
   inputs[4].value = get_temperature(analog[4]);
+
   reset_moving_average();
   delay(100);
 
@@ -182,9 +183,10 @@ void setup() {
   }
   
   // Initial Setup
-  // outputs[1].set_timer(5,60,125);
-  outputs[3].set_pid(&inputs[3].value, 48);
-  outputs[3].set_output_limits(0, 240);
+  //outputs[0].set_timer(15,60,255);
+  //outputs[1].set_timer(15,60,125);
+  outputs[4].set_pid(&inputs[3].value, 48);
+  outputs[4].set_output_limits(0, 240);
   // ------------ Modify Configuration -------------- //
 }
 
@@ -199,7 +201,6 @@ void loop() {
     inputs[2].value = get_ph(analog[2]);
     inputs[3].value = get_temperature(analog[3]);
     inputs[4].value = get_temperature(analog[4]);
-
     outputs[1].write_output();
     outputs[2].write_output();
     outputs[3].write_output();
@@ -303,7 +304,7 @@ float get_current(float voltage){
 }
 
 float get_dissolved_oxygen(float voltage){
-  float dissolved_oxygen = 100 * 0.6844 * voltage;
+  float dissolved_oxygen = 85.1312926551 * voltage - 49.7487023023;
   return dissolved_oxygen;
 }
 

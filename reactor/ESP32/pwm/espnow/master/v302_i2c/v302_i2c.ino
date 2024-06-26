@@ -4,13 +4,12 @@
 #include "comms_handle.h"
 
 #define N_OUTPUTS 5
-#define N_INPUTS  0
-#define N_VOLUMES  1
+#define N_INPUTS  2
+#define N_VOLUMES 0
 #define N_SLAVES  0
 
 // Serial info
 String ADDRESS = "M1";
-int transmit_pin = 4;
 boolean new_command = false;
 String input_string = "";
 
@@ -22,9 +21,9 @@ String volumes_buffer = "";
 // Config Data
 Slave slaves[N_SLAVES];
 
-Input inputs[N_INPUTS];
+Input inputs[N_INPUTS] = {{ADDRESS, "i2c", 0, "delta_pressure_air_Pa"}, {ADDRESS, "i2c", 1, "pressure_psi"}};
 
-Input volumes[N_VOLUMES] = { {ADDRESS, "vol", 0, "vol_ml_per_10s", PIN_CH5} };
+Input volumes[N_VOLUMES]; // = { {ADDRESS, "i2c", 1, "vol_ml_per_min", PIN_CH5} };
 
 Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
 Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
@@ -42,10 +41,10 @@ float analog[N_INPUTS]; // This is an accumulator variable for analog inputs
 boolean DATA_READY = false;
 boolean VOLUMES_READY = false;
 int sample_number;
-uint32_t samples_per_second = 4;
+uint32_t samples_per_second = 2;
 uint32_t one_second = 1000000;
 uint32_t sample_time = one_second / samples_per_second;
-uint32_t volumes_time = 20 * one_second;
+uint32_t volumes_time = 60 * one_second;
 
 // SPI and I2C sensors
 Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
@@ -112,6 +111,30 @@ void init_timers(void){
   esp_timer_start_once(timer_volumes_handle, volumes_time);
 }
 
+//---------freq-counter-prototype--------------//
+bool RAISING = false;
+float total_dp = 0;
+float th=13.5;
+uint32_t counter;
+void freq_counter(void){
+  float dp = sensors.read_sen0343_diffpressure(1) + 10;
+  total_dp = total_dp + dp;
+  sample_number += 1;
+  float eval=dp-th;
+  if(eval>0 && RAISING==true){
+    counter = counter + 1;
+    RAISING = false;
+  }
+  if(eval<0 && RAISING==false){
+    RAISING=true;
+  }
+}
+void reset_freq_counter(void){
+  counter = 0;
+  sample_number = 0;
+  total_dp = 0;
+}
+
 void setup() {
   // Initialize functions
   init_comms();
@@ -124,12 +147,10 @@ void setup() {
   sensors.set_ref_voltage(3.3);
   sensors.set_mprls_range(0, 25);
   // Set readings
-  volumes[0].read = &Sensors::read_mprls;
+  inputs[0].read = &Sensors::read_sen0343_diffpressure;
+  inputs[1].read = &Sensors::read_mprls;
 
   // Initialize measurments
-  for(int i=0; i<N_VOLUMES; i++){
-    volumes[i].last_pressure = (sensors.*volumes[i].read)(i);
-  }
 
   // ------------ Modify Configuration -------------- //
 }
@@ -137,9 +158,11 @@ void setup() {
 void loop() {
   moving_average();
   if (DATA_READY) {
-    // Transform data
     get_moving_average();
     // ------------ Modify Configuration -------------- //
+    inputs[0].value = analog[0];
+    inputs[1].value = analog[1];
+    
     outputs[0].write_output();
     outputs[1].write_output();
     outputs[2].write_output();
@@ -148,11 +171,11 @@ void loop() {
     // ------------ Modify Configuration -------------- //
 
     // Update outputs
-
+    reset_moving_average();
     update_inputs_buffer(inputs, N_INPUTS, &inputs_buffer);
     update_outputs_buffer(outputs, N_OUTPUTS, &outputs_buffer);
+    // Serial.println(inputs[0].value);
     // Reset timer
-    reset_moving_average();
     esp_timer_start_once(timer_sensors_handle, sample_time);
     DATA_READY = false;
   }

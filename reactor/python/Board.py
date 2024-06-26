@@ -90,14 +90,13 @@ class Input():
 
 
 class Board():
-    def __init__(self, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400, config_dir: str = "configuration/"):
+    def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400, config_dir: str = "configuration/"):
         self.set_serial_port(port_name)
         self.set_baud_rate(baud_rate)
         self.open_connection(port_name)
-
+        self.address = address
         board_info_dict = self.request_board_info()
 
-        self.address = board_info_dict["ADDRESS"]
         self.id = self.address
         self.channel = 0
         self.port_name = port_name

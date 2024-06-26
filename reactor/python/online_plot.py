@@ -39,7 +39,7 @@ class Plotter:
         return data_df.loc[0, "date"]
 
     def get_data(self, time_span: float = 24):
-        query_str = f"SELECT * FROM {self.experiment} WHERE date >= datetime('now', 'localtime', '-24 {self.time_units}') AND ROWID % 4 = 0"
+        query_str = f"SELECT * FROM {self.experiment} WHERE date >= datetime('now', 'localtime', '-24 {self.time_units}') AND ROWID % 2 = 0"
         try:
             data_df = pd.DataFrame(
                 self.sqlite_db.cursor.execute(query_str)
@@ -163,14 +163,14 @@ class Plotter:
 
 if __name__ == "__main__":
     plotter = Plotter(
-        experiment_name="salida_h2_o2_C1", DATABASE_PATH="database.db",
-        time_units="minutes"
+        experiment_name="boletito_2000", DATABASE_PATH="database.db",
+        time_units="hours"
     )
 
-    plotter.set_ax_00_vars(["M0_3"])
-    plotter.set_ax_01_vars(["M0_temperature_0"])
-    plotter.set_ax_10_vars(["M1_vol_ml_per_10s"])
-    plotter.set_ax_11_vars(["M0_dissolved_oxygen"])
+    plotter.set_ax_00_vars(["M0_temperature_0"])
+    plotter.set_ax_01_vars(["M0_4", "M0_0"])
+    plotter.set_ax_10_vars(["M0_dissolved_oxygen"])
+    plotter.set_ax_11_vars(["M1_delta_pressure_air_Pa"])
 
     figure, grid = plotter.create_figure()
     plotter.create_axes(figure, grid)

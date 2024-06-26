@@ -56,6 +56,11 @@
           "gap": 0.0,
           "via_gap": 0.0,
           "width": 0.0
+        },
+        {
+          "gap": 0.2,
+          "via_gap": 0.0,
+          "width": 0.12
         }
       ],
       "drc_exclusions": [],
@@ -95,8 +100,8 @@
         "padstack": "warning",
         "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
-        "silk_edge_clearance": "ignore",
-        "silk_over_copper": "ignore",
+        "silk_edge_clearance": "warning",
+        "silk_over_copper": "warning",
         "silk_overlap": "warning",
         "skew_out_of_range": "error",
         "solder_mask_bridge": "error",
@@ -120,15 +125,15 @@
         "min_copper_edge_clearance": 0.5,
         "min_hole_clearance": 0.25,
         "min_hole_to_hole": 0.25,
-        "min_microvia_diameter": 0.19999999999999998,
-        "min_microvia_drill": 0.09999999999999999,
+        "min_microvia_diameter": 0.35,
+        "min_microvia_drill": 0.19999999999999998,
         "min_resolved_spokes": 2,
         "min_silk_clearance": 0.0,
         "min_text_height": 0.7999999999999999,
         "min_text_thickness": 0.08,
-        "min_through_hole_diameter": 0.3,
+        "min_through_hole_diameter": 0.19999999999999998,
         "min_track_width": 0.0,
-        "min_via_annular_width": 0.09999999999999999,
+        "min_via_annular_width": 0.15,
         "min_via_diameter": 0.5,
         "solder_mask_to_copper_clearance": 0.0,
         "use_height_for_length_calcs": true
@@ -178,11 +183,12 @@
       ],
       "track_widths": [
         0.0,
+        0.12,
+        0.16,
+        0.25,
+        0.3,
         0.5,
-        1.0,
-        1.5,
-        2.0,
-        2.2
+        1.0
       ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
@@ -216,7 +222,7 @@
           "drill": 0.0
         }
       ],
-      "zones_allow_external_fillets": false
+      "zones_allow_external_fillets": true
     },
     "ipc2581": {
       "dist": "",
@@ -433,7 +439,7 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "error",
+      "pin_to_pin": "warning",
       "power_pin_not_driven": "error",
       "similar_labels": "warning",
       "simulation_model_issue": "ignore",
@@ -472,68 +478,17 @@
       },
       {
         "bus_width": 12,
-        "clearance": 0.2,
+        "clearance": 0.3,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "Comms",
+        "name": "POWER",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.2,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 6
-      },
-      {
-        "bus_width": 12,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Power",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 1.3,
-        "via_diameter": 1.0,
-        "via_drill": 0.3,
-        "wire_width": 6
-      },
-      {
-        "bus_width": 12,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Power2",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.4,
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 6
-      },
-      {
-        "bus_width": 12,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Signal",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.2,
+        "track_width": 0.5,
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
@@ -546,124 +501,8 @@
     "netclass_assignments": null,
     "netclass_patterns": [
       {
-        "netclass": "Power",
-        "pattern": "+12V"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "SDA"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "SCL"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "RX"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "TX"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "-12V"
-      },
-      {
-        "netclass": "Power2",
+        "netclass": "POWER",
         "pattern": "GND"
-      },
-      {
-        "netclass": "Power2",
-        "pattern": "+3.3V"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "A_TX"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "B_TX"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "A_RX"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "B_RX"
-      },
-      {
-        "netclass": "Power2",
-        "pattern": "+5V"
-      },
-      {
-        "netclass": "Power2",
-        "pattern": "/fuse_5v"
-      },
-      {
-        "netclass": "Power2",
-        "pattern": "/5v_protected"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/12v_sens"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/SDA"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/SPI_DIN"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/SPI_DOUT"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/SPI_CLK"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/CS2"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/SCL"
-      },
-      {
-        "netclass": "Comms",
-        "pattern": "/TX"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/12v_in"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG0"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG1"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG2"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG3"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG4"
-      },
-      {
-        "netclass": "Power",
-        "pattern": "/FETNEG5"
       }
     ]
   },
@@ -672,7 +511,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "production/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
@@ -716,7 +555,7 @@
           "show": true
         },
         {
-          "group_by": false,
+          "group_by": true,
           "label": "Footprint",
           "name": "Footprint",
           "show": true
@@ -849,18 +688,6 @@
         },
         {
           "group_by": false,
-          "label": "Sim.Device",
-          "name": "Sim.Device",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Sim.Pins",
-          "name": "Sim.Pins",
-          "show": false
-        },
-        {
-          "group_by": false,
           "label": "SnapEDA_Link",
           "name": "SnapEDA_Link",
           "show": false
@@ -919,16 +746,20 @@
   },
   "sheets": [
     [
-      "f275995d-e5b5-425a-b4cf-d04224d3feca",
+      "6815c4e2-4e65-473e-add7-c7110c44c7e5",
       "Raíz"
     ],
     [
-      "93787006-acae-41b1-bf89-2f149b3d5be6",
-      "i2c"
+      "1ca5fe9a-c586-43cc-873f-921081e5667c",
+      "I2C"
     ],
     [
-      "31069713-233f-4c9d-9e9d-ccd69244caa1",
-      "adc0"
+      "f390db59-ffc5-47e9-834f-5106f5c964f7",
+      "RS485"
+    ],
+    [
+      "30b07f5b-47ff-40c3-aa31-8c7f74b6380d",
+      "ADC"
     ]
   ],
   "text_variables": {}
