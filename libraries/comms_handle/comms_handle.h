@@ -5,6 +5,7 @@
 #define GET_BOARD_INFO 0
 #define TOGGLE_CONTROL_MODE 1
 #define GET_ALL_DATA 2
+#define WRITE_DAC 3
 
 // MAX485 PINS
 #define Rx 16

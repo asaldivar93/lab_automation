@@ -29,3 +29,6 @@ results/
 *.csv
 *.log
 *-backups/
+*.zip
+production/
+*-cache

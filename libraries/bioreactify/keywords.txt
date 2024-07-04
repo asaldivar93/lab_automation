@@ -2,7 +2,18 @@ Output	KEYWORD1
 Input	KEYWORD1
 OUTPUT	KEYWORD1
 A4988	KEYWORD1
+MCP3208 KEYWORD1
+TaskHandle_t	KEYWORD1
+esp_timer_handle_t	KEYWORD1
+esp_timer_create_args_t	KEYWORD1
+
 read_sen0546_temperature	KEYWORD2
+esp_now_register_recv_cb	KEYWORD2
+esp_now_register_send_cb	KEYWORD2
+set_temperature_resistor	KEYWORD2
+set_dissolved_oxygen_cal	KEYWORD2
+xTaskCreatePinnedToCore	KEYWORD2
+set_multiplexer_channel	KEYWORD2
 read_sen0322_address_0	KEYWORD2
 read_sen0322_address_1	KEYWORD2
 read_sen0322_address_2	KEYWORD2
@@ -11,10 +22,17 @@ get_dissolved_oxygen	KEYWORD2
 reset_pulse_counters	KEYWORD2
 reset_moving_average	KEYWORD2
 read_sen0546_humidity	KEYWORD2
+esp_timer_start_once	KEYWORD2
+set_temperature_cal	KEYWORD2
+esp_now_add_peer	KEYWORD2
+esp_timer_create	KEYWORD2
 get_moving_average	KEYWORD2
 write_output_vals	KEYWORD2
 set_output_limits	KEYWORD2
 set_manual_output	KEYWORD2
+get_analog_value	KEYWORD2
+set_sample_time_us	KEYWORD2
+esp_now_init	KEYWORD2
 set_sample_time	KEYWORD2
 set_gh_filter	KEYWORD2
 set_pid_tunings	KEYWORD2

@@ -13,48 +13,35 @@
 
 // Communication pins to SPI
 #define SPI_CLK  5
-#define SPI_DOUT 18
-#define SPI_DIN  19
-#define CS0      23
+#define SPI_MISO 18
+#define SPI_MOSI 19
+#define CS0  23
+#define CS1  15
 
 // PWM PARAMETERS
 #define LEDC_BIT 8
-#define LEDC_BASE_FREQ 800
+#define LEDC_BASE_FREQ 500
+
 #define PIN_CH0 13
 #define PIN_CH1 12
 #define PIN_CH2 14
 #define PIN_CH3 27
-#define PIN_CH4 26
-#define PIN_CH5 25
+#define PIN_CH4 33
+#define PIN_CH5 32
+#define PIN_CH6 2
+#define PIN_CH7 4
+
+#define DAC1 25
+#define DAC2 26
 
 // Inputs and Outputs structures
-
-class Sensors
-{
+class MCP3208 {
 public:
-  // MCP3208
-  Sensors(uint8_t dataIn, uint8_t dataOut, uint8_t clock); //SOFTWARE SPI
+  MCP3208(uint8_t MISO, uint8_t MOSI, uint8_t clock);
   void begin(uint8_t select);
-  void set_spi_speed(uint32_t speed); // speed in Hz
   void set_ref_voltage(float ref_voltage);
+  void set_spi_speed(uint32_t speed); // speed in Hz
   float read_adc(uint8_t channel);
-
-  // SEN0546 Temp and Humidity sensor
-  float read_sen0546_temperature(uint8_t channel);
-  float read_sen0546_humidity(uint8_t channel);
-
-  // SEN0322 Oxygen Sensor
-
-  float read_sen0322_address_0(uint8_t channel);
-  float read_sen0322_address_1(uint8_t channel);
-  float read_sen0322_address_2(uint8_t channel);
-  float read_sen0322_default(uint8_t channel);
-
-  // MPRLS Pressure sensor
-  float read_mprls(uint8_t channel);
-  void set_mprls_range(float p_min, float p_max);
-
-  float read_sen0343_diffpressure(uint8_t channel)
 
 private:
   // MCP3208
@@ -69,42 +56,67 @@ private:
   float _ref_voltage = 3.3;
   uint8_t  _build_request_mcp3208(uint8_t channel, uint8_t * data);
   uint8_t  _swSPI_transfer(uint8_t d);
+};
+
+class Sensors{
+public:
+  Sensors(uint8_t TCA954X_ADDRESS);
+  void set_multiplexer_channel(uint8_t channel);
 
   // SEN0546 Temp and Humidity sensor
-  uint8_t _SEN0546_ADDRESS=0x40;
+  float read_sen0546_temperature();
+  float read_sen0546_humidity();
+
+  // SEN0322 Oxygen Sensor
+  float read_sen0322_address_0();
+  float read_sen0322_address_1();
+  float read_sen0322_address_2();
+  float read_sen0322_default();
+
+  // MPRLS Pressure sensor
+  float read_mprls();
+  void set_mprls_range(float p_min, float p_max);
+
+  float read_sen0343_diffpressure();
+
+private:
+  uint8_t _TCA954X_ADDRESS;
+
+  // SEN0546 Temp and Humidity sensor
+  uint8_t _SEN0546_ADDRESS = 0x40;
   uint8_t _temperature_register = 0x00;
   uint8_t _humidity_register = 0x01;
 
   // SEN0322 Oxygen Sensor
   float _read_sen0322(uint8_t address);
-  uint8_t _SEN0322_DEFAULT_ADDRESS=0x73;
-  uint8_t _SEN0322_ADDRESS_0=0x70;
-  uint8_t _SEN0322_ADDRESS_1=0x71;
-  uint8_t _SEN0322_ADDRESS_2=0x72;
+  uint8_t _SEN0322_DEFAULT_ADDRESS = 0x73;
+  uint8_t _SEN0322_ADDRESS_0 = 0x70;
+  uint8_t _SEN0322_ADDRESS_1 = 0x71;
+  uint8_t _SEN0322_ADDRESS_2 = 0x72;
   uint8_t _o2_data_register = 0x03;
   float _cal = 20.9 / 100;
 
   // SEN0343 Differential pressure sensor
-  uint8_t _SEN0343_ADDRESS=0x00;
+  uint8_t _SEN0343_ADDRESS = 0x00;
 
   // MPRLS Pressure Sensor
-  uint8_t _MPRLS_DEFAULT_ADDRESS=0x18;
+  uint8_t _MPRLS_DEFAULT_ADDRESS = 0x18;
   float _p_min = 0;
   float _p_max = 25;
-  float _out_min=1677722;
-  float _out_max=15099494;
+  float _out_min = 1677722;
+  float _out_max = 15099494;
   float _conversion = 1;
   float _press_counts = 0;
   float _pressure;
 };
 
-class Output
-{
+class Output {
 public:
   Output(int Channel, int Pin, String Type, int Control_mode, int Value);
 
   void get_info(void);
   void write_output(void);
+  void write_dac(int value);
   void set_manual_output(int value);
   void set_timer(int time_on, int time_off, int value);
   void set_pid(float *input_value, float setpoint);
@@ -149,22 +161,56 @@ private:
   float _output_max = 255;
 };
 
+class Input{
+public:
+  Input(int channel, String type, String variable);
 
-typedef float (Sensors::*Readfunc) (uint8_t channel);
-typedef struct{
-  String address;
-  String type;
+  void moving_average(float analog);
+  void get_moving_average();
+  void reset_moving_average();
+  float get_number_of_samples();
+  float get_analog_value();
+
+  void set_ref_voltage(float vref);
+  void set_current_cal(float m, float b);
+  void set_dissolved_oxygen_cal(float m, float b);
+  void set_ph_cal(float m, float b);
+  void set_temperature_cal(float a, float b, float c);
+  void set_temperature_resistor(float resistor_value);
+
+  void set_blank();
+
+  void get_ph();
+  void get_dissolved_oxygen();
+  void get_temperature();
+  void get_current();
+  void get_absorbance();
+
   int channel;
+  String type;
   String variable;
-  int pin;
+
   float value;
-  float delta_pressure;
-  float last_pressure;
-  String message_bp;
-  Readfunc read;
-  bool is_on;
-  unsigned long start_millis;
-} Input;
+
+private:
+  float _ref_voltage = 3.3;
+  float _analog_value;
+  uint32_t _number_of_samples;
+
+  float _m_ph;
+  float _b_ph;
+  float _m_oxygen;
+  float _b_oxygen;
+  float _m_current;
+  float _b_current;
+
+  float _resistor_value;
+  float _a_temp;
+  float _b_temp;
+  float _c_temp;
+
+  float _blank;
+};
 
 typedef struct {
   int ms1;
@@ -174,11 +220,4 @@ typedef struct {
   int dir_pin;
 } A4988;
 
-float get_current(float voltage);
-
-float get_dissolved_oxygen(float voltage);
-
-float get_ph(float voltage);
-
-float get_temperature(float voltage);
 #endif

@@ -2,19 +2,16 @@
 #include "bioreactify.h"
 
 
-Sensors::Sensors(uint8_t dataIn, uint8_t dataOut, uint8_t clock)
-{
-  _dataIn  = dataIn;
-  _dataOut = dataOut;
+MCP3208::MCP3208(uint8_t MISO, uint8_t MOSI, uint8_t clock) {
+  _dataIn  = MISO;
+  _dataOut = MOSI;
   _clock   = clock;
   _select  = 255;
   _channels = 8;
   _maxValue = 4095;
 }
 
-
-void Sensors::begin(uint8_t select)
-{
+void MCP3208::begin(uint8_t select){
   // MCP3208
   _select = select;
   pinMode(_select, OUTPUT);
@@ -31,23 +28,16 @@ void Sensors::begin(uint8_t select)
   digitalWrite(_clock,   LOW);
 }
 
-
-void Sensors::set_ref_voltage(float ref_voltage){
+void MCP3208::set_ref_voltage(float ref_voltage){
   _ref_voltage = ref_voltage;
 }
 
-void Sensors::set_spi_speed(uint32_t speed){
+void MCP3208::set_spi_speed(uint32_t speed){
   _SPIspeed = speed;
   _spi_settings = SPISettings(_SPIspeed, MSBFIRST, SPI_MODE0);
 }
 
-void Sensors::set_mprls_range(float p_min, float p_max){
-  _p_min = p_min;
-  _p_max = p_max;
-}
-
-
-float Sensors::read_adc(uint8_t channel){
+float MCP3208::read_adc(uint8_t channel){
   if (channel >= _channels) return 0;
 
   uint8_t  data[3] = { 0,0,0 };
@@ -62,8 +52,7 @@ float Sensors::read_adc(uint8_t channel){
   return ((256 * data[1] + data[2]) & _maxValue) * (_ref_voltage / _maxValue);
 }
 
-
-uint8_t Sensors::_swSPI_transfer(uint8_t val){
+uint8_t MCP3208::_swSPI_transfer(uint8_t val){
   uint8_t clk = _clock;
   uint8_t dao = _dataOut;
   uint8_t dai = _dataIn;
@@ -79,8 +68,7 @@ uint8_t Sensors::_swSPI_transfer(uint8_t val){
   return rv;
 }
 
-
-uint8_t Sensors::_build_request_mcp3208(uint8_t channel, uint8_t * data){
+uint8_t MCP3208::_build_request_mcp3208(uint8_t channel, uint8_t * data){
   //  P21  fig 6.1   MCP3204/3208
   data[0] = 0x04;  //  start bit
   data[0] |= 0x02; //  single read
@@ -89,29 +77,36 @@ uint8_t Sensors::_build_request_mcp3208(uint8_t channel, uint8_t * data){
   return 3;
 }
 
+Sensors::Sensors(uint8_t TCA954X_ADDRESS){
+  _TCA954X_ADDRESS = TCA954X_ADDRESS;
+}
 
-float Sensors::read_sen0322_address_0(uint8_t channel){
+void Sensors::set_multiplexer_channel(uint8_t channel){
+  Wire.beginTransmission(_TCA954X_ADDRESS);
+  int _status = Wire.write(0x04 | channel);
+  _status = Wire.endTransmission();
+}
+
+float Sensors::read_sen0322_address_0(){
   return _read_sen0322(_SEN0322_ADDRESS_0);
 }
 
-
-float Sensors::read_sen0322_address_1(uint8_t channel){
+float Sensors::read_sen0322_address_1(){
   return _read_sen0322(_SEN0322_ADDRESS_1);
 }
 
-
-float Sensors::read_sen0322_address_2(uint8_t channel){
+float Sensors::read_sen0322_address_2(){
   return _read_sen0322(_SEN0322_ADDRESS_2);
 }
 
-
-float Sensors::read_sen0322_default(uint8_t channel){
+float Sensors::read_sen0322_default(){
   return _read_sen0322(_SEN0322_DEFAULT_ADDRESS);
 }
 
-
 float Sensors::_read_sen0322(uint8_t address){
-  uint8_t _data[10]={0};
+  uint8_t _size = 3;
+  uint8_t _data[_size] = {0};
+
   Wire.beginTransmission(address);
   int _status = Wire.write(_o2_data_register);
   _status = Wire.endTransmission();
@@ -120,15 +115,19 @@ float Sensors::_read_sen0322(uint8_t address){
   }
 
   delay(6);
-  Wire.requestFrom(address, (uint8_t) 3);
-  for(int i=0; i<3; i++){
+  Wire.requestFrom(address, _size);
+  for(int i=0; i<_size; i++){
     _data[i] = Wire.read();
   }
   return _cal * ((float)_data[0] + ( (float)_data[1] / 10.0) + ( (float)_data[2] / 100.0));
 }
 
+void Sensors::set_mprls_range(float p_min, float p_max){
+  _p_min = p_min;
+  _p_max = p_max;
+}
 
-float Sensors::read_mprls(uint8_t channel){
+float Sensors::read_mprls(){
   uint8_t _size = 7;
   uint8_t _data[_size];
   uint8_t _request[3] = {0xAA, 0x00, 0x00};
@@ -150,8 +149,7 @@ float Sensors::read_mprls(uint8_t channel){
   return _pressure * _conversion;
 }
 
-
-float Sensors::read_sen0546_temperature(uint8_t channel){
+float Sensors::read_sen0546_temperature(){
   uint8_t _size = 2;
   uint8_t _buffer[_size];
   uint16_t _data;
@@ -165,15 +163,14 @@ float Sensors::read_sen0546_temperature(uint8_t channel){
 
   delay(10);
   Wire.requestFrom(_SEN0546_ADDRESS, _size);
-  for(int i=0; i<2; i++){
+  for(int i=0; i<_size; i++){
     _buffer[i] = Wire.read();
   }
   _data = _buffer[0] << 8 | _buffer[1];
   return 165 * ( (float)_data / 65535.0) - 40;
 }
 
-
-float Sensors::read_sen0546_humidity(uint8_t channel){
+float Sensors::read_sen0546_humidity(){
   uint8_t _size = 2;
   uint8_t _buffer[_size];
   uint16_t _data;
@@ -187,45 +184,11 @@ float Sensors::read_sen0546_humidity(uint8_t channel){
 
   delay(10);
   Wire.requestFrom(_SEN0546_ADDRESS, _size);
-  for(int i=0; i<2; i++){
+  for(int i=0; i<_size; i++){
     _buffer[i] = Wire.read();
   }
   _data = _buffer[0] << 8 | _buffer[1];
   return 100 * ( (float)_data / 65535.0);
-}
-
-float Sensors::read_sen0343_diffpressure(uint8_t channel){
-  uint8_t _config = {0xaa,0x00,0x80};
-  uint8_t _request=0x01;
-  uint8_t _size = 7;
-  uint8_t _data[_size];
-
-  Wire.beginTransmission(_SEN0343_ADDRESS);
-  int _status = Wire.write(_config, 3);
-  _status = Wire.endTransmission();
-  if(_status != 0){
-    return 0;
-  }
-  Serial.println("1");
-  delay(30);
-
-  Wire.beginTransmission(_SEN0343_ADDRESS);
-  int _status = Wire.write(_request);
-  _status = Wire.endTransmission();
-  if(_status != 0){
-    return 0;
-  }
-  Serial.println("2");
-
-  delay(10);
-  Wire.requestFrom(_SEN0343_ADDRESS, _size);
-  for(int i=0; i<_size; i++){
-    _data[i] = Wire.read();
-  }
-  uint16_t _pressure_data = (data[1] << 8) + data[2];
-  _pressure_data = _pressure_data >> 2;
-  float _diff_pressure = ((500 - (-500)) / 16384.0) * (float) _pressure_data + (-500);
-  return _diff_pressure;
 }
 
 Output::Output(int Channel, int Pin, String Type, int Control_mode, int Value){
@@ -284,6 +247,10 @@ void Output::write_output(void) {
       break;
   }
   ledcWrite(channel, value);
+}
+
+void Output::write_dac(int value){
+  dacWrite(pin, value);
 }
 
 void Output::set_manual_output(int value){
@@ -349,8 +316,8 @@ void Output::set_gh_filter(float alpha){
 
 void Output::set_pid_tunings(float Kp, float Ki, float Kd){
   _kp = Kp;
-  _ki = Ki * _sample_time_s;
-  _kd = Kd / _sample_time_s;
+  _ki = Ki * _sample_time_us;
+  _kd = Kd / _sample_time_us;
 }
 
 void Output::set_output_limits(float min, float max){
@@ -363,4 +330,88 @@ void Output::initialize_pid(){
   _last_error = 0;
   _integral_sum = 0;
   _filtered_input = (*_input_value);
+}
+
+Input::Input(int channel, String type, String variable){
+  channel = channel;
+  type = type;
+  variable = variable;
+  _analog_value = 0;
+  _number_of_samples = 0;
+}
+
+float Input::get_number_of_samples(){
+  return _number_of_samples;
+}
+
+float Input::get_analog_value(){
+  return _analog_value;
+}
+
+void Input::moving_average(float analog){
+  _analog_value += analog;
+  _number_of_samples += 1;
+}
+
+void Input::get_moving_average(){
+  _analog_value /= _number_of_samples;
+}
+
+void Input::reset_moving_average(){
+  _analog_value = 0;
+  _number_of_samples = 0;
+}
+
+void Input::set_ref_voltage(float vref){
+  _ref_voltage = vref;
+}
+
+void Input::set_current_cal(float m, float b){
+  _m_current = m;
+  _b_current = b;
+}
+
+void Input::set_dissolved_oxygen_cal(float m, float b){
+  _m_oxygen = m;
+  _b_oxygen = b;
+}
+
+void Input::set_ph_cal(float m, float b){
+  _m_ph = m;
+  _b_ph = b;
+}
+
+void Input::set_temperature_cal(float a, float b, float c){
+  _a_temp = a;
+  _b_temp = b;
+  _c_temp = c;
+}
+
+void Input::set_temperature_resistor(float resistor_value){
+  _resistor_value = resistor_value;
+}
+
+void Input::get_ph(){
+  value = _m_ph * _analog_value + _b_ph;
+}
+
+void Input::get_dissolved_oxygen(){
+  value = _m_oxygen * _analog_value + _b_oxygen;
+}
+
+void Input::get_current(){
+  value = (_analog_value + _b_current) / _m_current;
+}
+
+void Input::get_temperature(){
+  float resistance = _resistor_value / ((_ref_voltage / _analog_value) - 1);
+  value = (1 / ( _a_temp + _b_temp*log(resistance) + _c_temp*pow(log(resistance), 3) )) - 273.15;
+}
+
+void Input::set_blank(){
+  _blank = _analog_value;
+}
+
+void Input::get_absorbance(){
+  value = log(_blank / _analog_value);
 }
