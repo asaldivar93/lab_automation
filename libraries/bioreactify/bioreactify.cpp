@@ -191,6 +191,31 @@ float Sensors::read_sen0546_humidity(){
   return 100 * ( (float)_data / 65535.0);
 }
 
+float Sensors::read_sen0343_diffpressure(){
+  uint8_t _config[3] = {0xaa,0x00,0x80};
+  uint8_t _request=0x01;
+  uint8_t _size = 7;
+  uint8_t _data[_size];
+
+  Wire.beginTransmission(_SEN0343_ADDRESS);
+  int _status = Wire.write(_config, 3);
+  _status = Wire.endTransmission();
+  if(_status != 0){
+    return 0;
+  }
+  delay(10);
+
+  Wire.requestFrom(_SEN0343_ADDRESS, _size);
+  for(int i=0; i<_size; i++){
+    _data[i] = Wire.read();
+  }
+
+  uint16_t _pressure_data = (_data[1] << 8) + _data[2];
+  _pressure_data = _pressure_data >> 2;
+  float _diff_pressure = ((500 - (-500)) / 16384.0) * (float) _pressure_data + (-500) + 2;
+  return _diff_pressure;
+}
+
 Output::Output(int Channel, int Pin, String Type, int Control_mode, int Value){
   channel = Channel;
   pin = Pin;
@@ -251,6 +276,9 @@ void Output::write_output(void) {
 
 void Output::write_dac(int value){
   dacWrite(pin, value);
+  if(value==0){
+  	digitalWrite(pin, LOW);
+  }
 }
 
 void Output::set_manual_output(int value){
@@ -307,7 +335,7 @@ float Output::compute_pid(float input) {
 
 void Output::set_sample_time_us(uint32_t sample_time_us){
   _sample_time_us = sample_time_us;
-  float _sample_time_s = (float) _sample_time_us / 1000000;
+  _sample_time_s = (float) _sample_time_us / 1000000;
 }
 
 void Output::set_gh_filter(float alpha){
@@ -316,8 +344,8 @@ void Output::set_gh_filter(float alpha){
 
 void Output::set_pid_tunings(float Kp, float Ki, float Kd){
   _kp = Kp;
-  _ki = Ki * _sample_time_us;
-  _kd = Kd / _sample_time_us;
+  _ki = Ki * _sample_time_s;
+  _kd = Kd / _sample_time_s;
 }
 
 void Output::set_output_limits(float min, float max){
@@ -332,20 +360,12 @@ void Output::initialize_pid(){
   _filtered_input = (*_input_value);
 }
 
-Input::Input(int channel, String type, String variable){
-  channel = channel;
-  type = type;
-  variable = variable;
+Input::Input(int Channel, String Type, String Variable){
+  channel = Channel;
+  type = Type;
+  variable = Variable;
   _analog_value = 0;
   _number_of_samples = 0;
-}
-
-float Input::get_number_of_samples(){
-  return _number_of_samples;
-}
-
-float Input::get_analog_value(){
-  return _analog_value;
 }
 
 void Input::moving_average(float analog){
@@ -360,6 +380,14 @@ void Input::get_moving_average(){
 void Input::reset_moving_average(){
   _analog_value = 0;
   _number_of_samples = 0;
+}
+
+float Input::get_number_of_samples(){
+  return _number_of_samples;
+}
+
+float Input::get_analog_value(){
+  return _analog_value;
 }
 
 void Input::set_ref_voltage(float vref){
@@ -381,16 +409,6 @@ void Input::set_ph_cal(float m, float b){
   _b_ph = b;
 }
 
-void Input::set_temperature_cal(float a, float b, float c){
-  _a_temp = a;
-  _b_temp = b;
-  _c_temp = c;
-}
-
-void Input::set_temperature_resistor(float resistor_value){
-  _resistor_value = resistor_value;
-}
-
 void Input::get_ph(){
   value = _m_ph * _analog_value + _b_ph;
 }
@@ -403,15 +421,54 @@ void Input::get_current(){
   value = (_analog_value + _b_current) / _m_current;
 }
 
-void Input::get_temperature(){
-  float resistance = _resistor_value / ((_ref_voltage / _analog_value) - 1);
-  value = (1 / ( _a_temp + _b_temp*log(resistance) + _c_temp*pow(log(resistance), 3) )) - 273.15;
-}
-
 void Input::set_blank(){
   _blank = _analog_value;
 }
 
 void Input::get_absorbance(){
   value = log(_blank / _analog_value);
+}
+
+void Input::set_steinhart_coeffs(float a, float b, float c){
+  _a_temp = a;
+  _b_temp = b;
+  _c_temp = c;
+}
+
+void Input::set_voltage_divider_resistor(float resistor_value){
+  _resistor_divider = resistor_value;
+}
+
+void Input::set_opamp_resistors(float resistor_feedback, float resistor_reference){
+  _resistor_feedback = resistor_feedback;
+  _resistor_referenece = resistor_reference;
+  _r23 = pow(_resistor_referenece, 2) / (2 * _resistor_referenece);
+  _r43 = _resistor_feedback / _resistor_referenece;
+  _gain = (_r23 + _resistor_feedback) / _r23;
+}
+
+float Input::get_resistance(uint8_t type){
+  float resistance;
+  switch(type) {
+    case 0:
+      resistance = _resistor_divider / ((_ref_voltage / _analog_value) - 1);
+      break;
+    case 1:
+      resistance = (_gain * _resistor_divider / ((_analog_value / _ref_voltage) + _r43)) - _resistor_divider;
+      break;
+  }
+  return resistance;
+}
+void Input::get_temp_voltage_divider(){
+  float resistance = get_resistance(0);
+  value = (1 / _get_steinhart_eq(resistance)) - 273.15;
+}
+
+void Input::get_temp_opamp(){
+  float resistance = get_resistance(1);
+  value = (1 / _get_steinhart_eq(resistance)) - 273.15;
+}
+
+float Input::_get_steinhart_eq(float resistance){
+  return _a_temp + _b_temp*log(resistance) + _c_temp*pow(log(resistance), 3);
 }

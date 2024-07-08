@@ -1,57 +1,96 @@
 #include <Arduino.h>
-#include <esp_now.h>
-#include <Wire.h>
 
 #include "bioreactify.h"
 #include "comms_handle.h"
+#include "AS7341.h"
 
-#define N_OUTPUTS 5
-#define N_INPUTS  0
+#define N_PWM 0
+#define N_DAC 2
 
-// Serial info
+#define N_ADC 0
+#define N_I2C 0
+#define N_SLAVES 0
+
+// Serial Configuration
 String ADDRESS = "M0";
 boolean new_command = false;
 String input_string = "";
 
-// Seriaf buffers
-String outputs_buffer = "";
-String inputs_buffer = "";
+String pwm_buffer = "";
+String adc_buffer = "";
+String i2c_buffer = "";
 
+// Timers Configuration
+uint32_t one_second = 1000000;
+
+boolean TIMER_1 = false;
+uint32_t samples_per_second_timer_1 = 4;
+uint32_t cycle_time_timer_1 = one_second / samples_per_second_timer_1;
+
+boolean TIMER_2 = false;
+uint32_t samples_per_second_timer_2 = 1;
+uint32_t seconds_per_cycle_timer_2= 2;
+// uint32_t cycle_time_timer_2 = one_second / samples_per_second_timer_2;
+uint32_t cycle_time_timer_2 = one_second * seconds_per_cycle_timer_2;
+
+// PID Configuration
 float Kp = 100;
 float Ki = 0.2;
 float Kd = 0.;
 
-// Measurment Variables
-float analog[N_INPUTS]; // This is an accumulator variable for analog inputs
-boolean DATA_READY = false;
-int sample_number;
-uint32_t samples_per_second = 4;
-uint32_t one_second = 1000000;
-uint32_t sample_time = one_second / samples_per_second;
+Slave slaves[N_SLAVES];
 
-// Config Data
-Input inputs[N_INPUTS];
+// PWM Configuration
+// Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
+Output outputs[N_PWM];
 
-Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
-Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
-Output CH_2(2, PIN_CH2, "pwm", MANUAL, 0);
-Output CH_3(3, PIN_CH3, "pwm", MANUAL, 0);
-Output CH_4(4, PIN_CH4, "pwm", MANUAL, 0);
-Output outputs[N_OUTPUTS] = {CH_0, CH_1, CH_2, CH_3, CH_4};
+// DAC Configuration
+Output DAC_1(0, DAC1, "dac", MANUAL, 0);
+Output DAC_2(1, DAC2, "dac", MANUAL, 0);
+Output dacs[N_DAC] = {DAC_1, DAC_2};
 
-Sensors sensors(SPI_DOUT, SPI_DIN, SPI_CLK);
+// ADC Configuration
+// MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
+// Input ACH_0(0, "adc", "temperature_0");
+Input analogs[N_ADC];
 
-// Timer for sensors reading
-esp_timer_create_args_t timer_sensor_args;
-esp_timer_handle_t timer_sensors_handle;
-void flag_data_ready(void *p) {
-  DATA_READY = true;
+// I2C Configuration
+uint8_t multiplexer_address = 0x70;
+Sensors sensors(multiplexer_address);
+Input digitals[N_I2C];
+
+DFRobot_AS7341 spectro_0;
+
+
+// Timer Configuration
+esp_timer_create_args_t timer_1_args;
+esp_timer_handle_t timer_1_handle;
+void timer_1_callback(void *p) {
+  TIMER_1 = true;
+}
+
+esp_timer_create_args_t timer_2_args;
+esp_timer_handle_t timer_2_handle;
+void timer_2_callback(void *p) {
+  TIMER_2 = true;
+}
+
+void init_timers(void){
+  // Initialize timers
+  timer_1_args.callback = timer_1_callback;
+  esp_timer_create(&timer_1_args, &timer_1_handle);
+  esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
+
+  timer_2_args.callback = timer_2_callback;
+  esp_timer_create(&timer_2_args, &timer_2_handle);
+  esp_timer_start_once(timer_2_handle, cycle_time_timer_2);
 }
 
 // Parallel task for communication
 TaskHandle_t serial_comms;
 void serial_comms_code(void *parameters) {
   for (;;) {
+    vTaskDelay(10);
     String input_string = parse_serial_master(&new_command);
     parse_string(input_string);
   }
@@ -65,98 +104,118 @@ void init_comms(void){
 }
 
 void init_outputs(void){
-  // True outputs
-  for (int i = 0; i < N_OUTPUTS; i++) {
+  for (int i = 0; i < N_PWM; i++) {
     ledcSetup(outputs[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
     ledcAttachPin(outputs[i].pin, outputs[i].channel);
     ledcWrite(outputs[i].channel, outputs[i].value);
 
     outputs[i].set_output_limits(0, 255);
     outputs[i].set_pid_tunings(Kp, Ki, Kd);
-    outputs[i].set_sample_time_us(sample_time);
+    outputs[i].set_sample_time_us(cycle_time_timer_1);
     outputs[i].set_gh_filter(0.01);
   }
-}
-
-void init_timers(void){
-  // Initialize timers for sensors and volumes;
-  timer_sensor_args.callback = flag_data_ready;
-  esp_timer_create(&timer_sensor_args, &timer_sensors_handle);
-  esp_timer_start_once(timer_sensors_handle, sample_time);
 }
 
 void setup() {
   // Initialize functions
   init_comms();
-  init_outputs();
+  //init_outputs();
   init_timers();
-  Wire.begin();
-  sensors.begin(CS0);
+
   // ------------ Modify Configuration -------------- //
+  sensors.set_multiplexer_channel(0);
+  spectro_0.begin();
   
-  // Initialize measurments
-
-  
-  // Initial Setup
-
   // ------------ Modify Configuration -------------- //
 }
 
 void loop() {
+
+  // Sample analog channels as fast as possible
   
-  if (DATA_READY) {
-    // Transform data
-    uint8_t bus = 0;
-    Wire.beginTransmission(0x70);
-    int _status = Wire.write(0x04 | bus);
-    _status = Wire.endTransmission();
-    Serial.print(sensors.read_sen0546_temperature(0));
-    Serial.print(", ");
-    bus = 1;
-    Wire.beginTransmission(0x70);
-    _status = Wire.write(0x04 | bus);
-    _status = Wire.endTransmission();
-    Serial.println(sensors.read_sen0546_temperature(0));
-    
+  
+  if (TIMER_1) {
+    // Reset timer
+    esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
+    TIMER_1 = false;
     
     // ------------ Modify Configuration -------------- //
-    outputs[1].write_output();
-    outputs[2].write_output();
-    outputs[3].write_output();
-    outputs[4].write_output();
-    // ------------ Modify Configuration -------------- //
     
-    // Update outputs
+
+    
+  
+
+    
+    // ------------ Modify Configuration -------------- //
+
+    // Update buffers
+    update_inputs_buffer(analogs, N_ADC, &adc_buffer);
+    update_outputs_buffer(outputs, N_PWM, &pwm_buffer);
 
     // Reset timer
-    esp_timer_start_once(timer_sensors_handle, sample_time);
-    DATA_READY = false;
+    
   }
+
+  if (TIMER_2) {
+    // Reset timer
+    esp_timer_start_once(timer_2_handle, cycle_time_timer_2);
+    TIMER_2 = false;
+
+    // ------------ Modify Configuration -------------- //
+    DFRobot_AS7341::sModeOneData_t data1;
+    DFRobot_AS7341::sModeTwoData_t data2;
+    
+    spectro_0.startMeasure(spectro_0.eF1F4ClearNIR);
+    data1 = spectro_0.readSpectralDataOne();
+    
+ 
+    spectro_0.startMeasure(spectro_0.eF5F8ClearNIR);
+    data2 = spectro_0.readSpectralDataTwo();
+
+    Serial.print("F1(405-425nm):");
+    Serial.println(data1.ADF1);
+    Serial.print("F2(435-455nm):");
+    Serial.println(data1.ADF2);
+    Serial.print("F3(470-490nm):");
+    Serial.println(data1.ADF3);
+    Serial.print("F4(505-525nm):");   
+    Serial.println(data1.ADF4);
+    Serial.print("F5(545-565nm):");
+    Serial.println(data2.ADF5);
+    Serial.print("F6(580-600nm):");
+    Serial.println(data2.ADF6);
+    Serial.print("F7(620-640nm):");
+    Serial.println(data2.ADF7);
+    Serial.print("F8(670-690nm):");
+    Serial.println(data2.ADF8);
+    Serial.print("Clear:");
+    Serial.println(data2.ADCLEAR);
+    Serial.print("NIR:");
+    Serial.println(data2.ADNIR);
+    // ------------ Modify Configuration -------------- //
+    update_inputs_buffer(digitals, N_I2C, &i2c_buffer);
+  }
+
 }
 
+void send_board_info(void) {
+  String slaves_output_info = "";
+  String slaves_input_info = "";
 
-float get_current(float voltage){
-  float current = (voltage - 2.5012) / -0.067;
-  return current;
+  for (int i = 0; i < N_SLAVES; i++) {
+    slaves_output_info = slaves_output_info + "'" + slaves[i].name + "':[" + slaves[i].ouputsInfo + "],";
+    slaves_input_info = slaves_input_info + "'" + slaves[i].name + "':[" + slaves[i].inputsInfo + "],";
+  }
+
+  String outputs_string = "'outs':{'" + ADDRESS + "':[" + get_outputs_info(outputs, N_PWM) + "]," + slaves_output_info + "}";
+  String inputs_string = "'ins':{'" + ADDRESS + "':[" + get_inputs_info(analogs, N_ADC) + get_inputs_info(digitals, N_I2C) + "]," + slaves_input_info + "}";
+
+  String all_data_json = "{'address': '" + ADDRESS + "', ";
+  all_data_json = all_data_json + outputs_string + ", " + inputs_string;
+  all_data_json = all_data_json + "}115,!";
+  Serial.println(all_data_json);
 }
 
-float get_dissolved_oxygen(float voltage){
-  float dissolved_oxygen = 85.1312926551 * voltage - 49.7487023023;
-  return dissolved_oxygen;
-}
-
-float get_ph(float voltage){
-  float ph = 6.006 * voltage - 3.5108;
-  return ph;
-}
-
-float get_temperature(float voltage){
-  float input_voltage = 3.3;
-  float resistor_reference = 10000; // Vaulue of the termistor reference resistor in series
-  float resistance = resistor_reference / ((input_voltage / voltage) - 1);
-  float temperature = (1 / ( 8.7561e-4 + 2.5343e-4*log(resistance) + 1.84499e-7*pow(log(resistance), 3) )) - 273.15;
-  return temperature;
-}
 
 void parse_string(String input_string) {
   int firstcomma;
@@ -171,6 +230,45 @@ void parse_string(String input_string) {
     if (ADDR == ADDRESS) {
       firstcomma = input_string.indexOf(',');
       command = input_string.substring(input_string.indexOf(' '), firstcomma).toInt();
+
+      if (command == GET_BOARD_INFO) {
+        // GET_BOARD_INFO: "ADDR 0,!"
+        send_board_info();
+      }
+
+      if (command == GET_ALL_DATA) {
+        // GET_ALL_INPUTS: "ADDR 2,!"
+        String outputs_string = "'outs':[" + pwm_buffer + "],";
+        String inputs_string = "'ins':[" + adc_buffer + i2c_buffer + "]";
+        String to_send_string = "{'" + ADDRESS + "':{" + outputs_string + inputs_string + "}}115,!";
+        Serial.println(to_send_string);
+        pwm_buffer = "";
+        adc_buffer = "";
+        i2c_buffer = "";
+      }
+
+      if (command == WRITE_DAC) {
+        // "ADDR 3,CHANNEL,VALUE,!"
+        lastcomma = firstcomma;
+        nextcomma = input_string.indexOf(',', lastcomma + 1);
+        int channel = input_string.substring(lastcomma + 1, nextcomma).toInt();
+        lastcomma = nextcomma;
+        nextcomma = input_string.indexOf(',', lastcomma + 1);
+        int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
+
+        dacs[channel].write_dac(value);
+        Serial.println(ok_string);
+      }
+      
+      if (command == 4) {
+        // "ADDR 4,VALUE,!"
+        lastcomma = firstcomma;
+        nextcomma = input_string.indexOf(',', lastcomma + 1);
+        int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
+        //Set gain value(0~10 corresponds to X0.5,X1,X2,X4,X8,X16,X32,X64,X128,X256,X512)
+        spectro_0.setAGAIN(value);
+        Serial.println(ok_string);
+      }
 
       if (command == TOGGLE_CONTROL_MODE) {
         // MANUAL: "ADDR 1,0,OUT_CHANNEL,PWM,!"
@@ -220,7 +318,7 @@ void parse_string(String input_string) {
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               float setpoint = input_string.substring(lastcomma + 1, nextcomma).toFloat();
 
-              outputs[out_channel].set_pid(&inputs[in_channel].value, setpoint);
+              outputs[out_channel].set_pid(&analogs[in_channel].value, setpoint);
               outputs[out_channel].initialize_pid();
               Serial.println(ok_string);
               break;
@@ -240,7 +338,7 @@ void parse_string(String input_string) {
               nextcomma = input_string.indexOf(',', lastcomma + 1);
               int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
-              outputs[out_channel].set_onoff(&inputs[in_channel].value, lower_bound, upper_bound, value);
+              outputs[out_channel].set_onoff(&analogs[in_channel].value, lower_bound, upper_bound, value);
               Serial.println(ok_string);
               break;
             }

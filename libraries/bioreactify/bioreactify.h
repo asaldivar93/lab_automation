@@ -153,7 +153,7 @@ private:
   float _alpha = 0.01;
   float _filtered_input;
   uint32_t _sample_time_us = 250000;
-  float _samples_time_s = 0.25;
+  float _sample_time_s = 0.25;
   float _kp, _ki, _kd;
   float _integral_sum;
   float _last_error, _last_time;
@@ -163,8 +163,9 @@ private:
 
 class Input{
 public:
-  Input(int channel, String type, String variable);
+  Input(int Channel, String Type, String Variable);
 
+  // General functions
   void moving_average(float analog);
   void get_moving_average();
   void reset_moving_average();
@@ -172,19 +173,26 @@ public:
   float get_analog_value();
 
   void set_ref_voltage(float vref);
+
+  // pH, dissonlved oxygen, current
   void set_current_cal(float m, float b);
   void set_dissolved_oxygen_cal(float m, float b);
   void set_ph_cal(float m, float b);
-  void set_temperature_cal(float a, float b, float c);
-  void set_temperature_resistor(float resistor_value);
-
-  void set_blank();
-
   void get_ph();
   void get_dissolved_oxygen();
-  void get_temperature();
   void get_current();
+
+  // Optical sensors
+  void set_blank();
   void get_absorbance();
+
+  // Temperature
+  void set_steinhart_coeffs(float a, float b, float c);
+  void set_voltage_divider_resistor(float resistor_value);
+  void set_opamp_resistors(float resistor_feedback, float resistor_reference);
+  float get_resistance(uint8_t type);
+  void get_temp_voltage_divider();
+  void get_temp_opamp();
 
   int channel;
   String type;
@@ -193,6 +201,7 @@ public:
   float value;
 
 private:
+  int _channel;
   float _ref_voltage = 3.3;
   float _analog_value;
   uint32_t _number_of_samples;
@@ -204,7 +213,13 @@ private:
   float _m_current;
   float _b_current;
 
-  float _resistor_value;
+  float _resistor_divider;
+  float _resistor_feedback;
+  float _resistor_referenece;
+  float _r23;
+  float _r43;
+  float _gain;
+  float _get_steinhart_eq(float resistance);
   float _a_temp;
   float _b_temp;
   float _c_temp;

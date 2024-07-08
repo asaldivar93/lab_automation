@@ -2,11 +2,12 @@
 
 #include "bioreactify.h"
 #include "comms_handle.h"
+#include "SCD4x.h"
 
-#define N_PWM 8
+#define N_PWM 0
 #define N_DAC 2
 
-#define N_ADC 8
+#define N_ADC 0
 #define N_I2C 0
 #define N_SLAVES 0
 
@@ -28,7 +29,9 @@ uint32_t cycle_time_timer_1 = one_second / samples_per_second_timer_1;
 
 boolean TIMER_2 = false;
 uint32_t samples_per_second_timer_2 = 1;
-uint32_t cycle_time_timer_2 = one_second / samples_per_second_timer_2;
+uint32_t seconds_per_cycle_timer_2= 2;
+// uint32_t cycle_time_timer_2 = one_second / samples_per_second_timer_2;
+uint32_t cycle_time_timer_2 = one_second * seconds_per_cycle_timer_2;
 
 // PID Configuration
 float Kp = 100;
@@ -38,15 +41,8 @@ float Kd = 0.;
 Slave slaves[N_SLAVES];
 
 // PWM Configuration
-Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
-Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
-Output CH_2(2, PIN_CH2, "pwm", MANUAL, 0);
-Output CH_3(3, PIN_CH3, "pwm", MANUAL, 0);
-Output CH_4(4, PIN_CH4, "pwm", MANUAL, 0);
-Output CH_5(5, PIN_CH5, "pwm", MANUAL, 0);
-Output CH_6(6, PIN_CH6, "pwm", MANUAL, 0);
-Output CH_7(7, PIN_CH7, "pwm", MANUAL, 0);
-Output outputs[N_PWM] = {CH_0, CH_1, CH_2, CH_3, CH_4, CH_5, CH_6, CH_7};
+// Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
+Output outputs[N_PWM];
 
 // DAC Configuration
 Output DAC_1(0, DAC1, "dac", MANUAL, 0);
@@ -54,21 +50,16 @@ Output DAC_2(1, DAC2, "dac", MANUAL, 0);
 Output dacs[N_DAC] = {DAC_1, DAC_2};
 
 // ADC Configuration
-MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
-Input ACH_0(0, "adc", "temperature_0");
-Input ACH_1(1, "adc", "biomass_0");
-Input ACH_2(2, "adc", "temperature_1");
-Input ACH_3(3, "adc", "biomass_1");
-Input ACH_4(4, "adc", "temperature_2");
-Input ACH_5(5, "adc", "biomass_2");
-Input ACH_6(6, "adc", "temperature_3");
-Input ACH_7(7, "adc", "biomass_3");
-Input analogs[N_ADC] = {ACH_0, ACH_1, ACH_2, ACH_3, ACH_4, ACH_5, ACH_6, ACH_7};
+// MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
+// Input ACH_0(0, "adc", "temperature_0");
+Input analogs[N_ADC];
 
 // I2C Configuration
 uint8_t multiplexer_address = 0x70;
 Sensors sensors(multiplexer_address);
 Input digitals[N_I2C];
+
+SensirionI2CScd4x co2_sensor;
 
 // Timer Configuration
 esp_timer_create_args_t timer_1_args;
@@ -84,7 +75,7 @@ void timer_2_callback(void *p) {
 }
 
 void init_timers(void){
-  // Initialize timers for sensors and volumes;
+  // Initialize timers
   timer_1_args.callback = timer_1_callback;
   esp_timer_create(&timer_1_args, &timer_1_handle);
   esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
@@ -98,9 +89,9 @@ void init_timers(void){
 TaskHandle_t serial_comms;
 void serial_comms_code(void *parameters) {
   for (;;) {
+    vTaskDelay(10);
     String input_string = parse_serial_master(&new_command);
     parse_string(input_string);
-    vTaskDelay(10);
   }
 }
 
@@ -127,76 +118,58 @@ void init_outputs(void){
 void setup() {
   // Initialize functions
   init_comms();
-  init_outputs();
+  //init_outputs();
   init_timers();
 
   // ------------ Modify Configuration -------------- //
-  adc_0.begin(CS0);
-  adc_0.set_spi_speed(1000000);
-  adc_0.set_ref_voltage(3.3);
-  
-  float thermistor[3] = {8.1197e-4, 2.65207e-4, 1.272206e-7}; // 103JT-025 semitec
-  float ref_resistance = 5100;
-  float op_amp_resistors[2] = {1500, 2200};
-
-  for (int i=0; i<N_ADC; i+=2){
-    analogs[i].set_voltage_divider_resistor(ref_resistance);
-    analogs[i].set_opamp_resistors(op_amp_resistors[0], op_amp_resistors[1]);
-    analogs[i].set_steinhart_coeffs(thermistor[0], thermistor[1], thermistor[2]);
-    
-  }
+  sensors.set_multiplexer_channel(0);
+  co2_sensor.begin(Wire);
+  co2_sensor.stopPeriodicMeasurement();
+  co2_sensor.startPeriodicMeasurement();
   // ------------ Modify Configuration -------------- //
 }
 
 void loop() {
-
   // Sample analog channels as fast as possible
-  for(int i=0; i<N_ADC; i++){
-    uint8_t channel = analogs[i].channel;
-    float voltage = adc_0.read_adc(channel);
-    analogs[i].moving_average(voltage);
-  }
 
   if (TIMER_1) {
-    // Transform data
-    for(int i=0; i<N_ADC; i++){
-      analogs[i].get_moving_average();
-    }
+    // Reset timer
+    esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
+    TIMER_1 = false;
+
     // ------------ Modify Configuration -------------- //
-
-    for(int i=0; i<N_ADC; i+=2){
-      analogs[i].get_temp_opamp();
-      Serial.print(analogs[i].value);
-      Serial.print(", ");
-    }
-    Serial.println("");
-    
-    for(int i=1; i<N_ADC; i+=2){
-      analogs[i].value = analogs[i].get_analog_value();;
-    }
-
-    for(int i=0; i<N_PWM; i++){
-      outputs[i].write_output();
-    }
-
-    for(int i=0; i<N_ADC; i++){
-      analogs[i].reset_moving_average();
-    }
     // ------------ Modify Configuration -------------- //
 
     // Update buffers
     update_inputs_buffer(analogs, N_ADC, &adc_buffer);
     update_outputs_buffer(outputs, N_PWM, &pwm_buffer);
-
-    // Reset timer
-    esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
-    TIMER_1 = false;
   }
 
   if (TIMER_2) {
-    update_inputs_buffer(digitals, N_I2C, &i2c_buffer);
+    // Reset timer
     esp_timer_start_once(timer_2_handle, cycle_time_timer_2);
     TIMER_2 = false;
+
+    // ------------ Modify Configuration -------------- //
+    uint16_t co2 = 0;
+    float temperature = 0.0f;
+    float humidity = 0.0f;
+    bool isDataReady = false;
+    co2_sensor.getDataReadyFlag(isDataReady);
+    if(isDataReady){
+      co2_sensor.readMeasurement(co2, temperature, humidity);
+      Serial.print("Co2:");
+      Serial.print(co2);
+      Serial.print(", ");
+      Serial.print("Temperature:");
+      Serial.print(temperature);
+      Serial.print(", ");
+      Serial.print("Humidity:");
+      Serial.println(humidity);
+    }
+
+    // ------------ Modify Configuration -------------- //
+    update_inputs_buffer(digitals, N_I2C, &i2c_buffer);
   }
 
 }
@@ -260,6 +233,16 @@ void parse_string(String input_string) {
         int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
 
         dacs[channel].write_dac(value);
+        Serial.println(ok_string);
+      }
+
+      if (command == 4) {
+        // "ADDR 4,VALUE,!"
+        lastcomma = firstcomma;
+        nextcomma = input_string.indexOf(',', lastcomma + 1);
+        int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
+        //Set gain value(0~10 corresponds to X0.5,X1,X2,X4,X8,X16,X32,X64,X128,X256,X512)
+        //spectro_0.setAGAIN(value);
         Serial.println(ok_string);
       }
 
