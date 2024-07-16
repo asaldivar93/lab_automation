@@ -3,7 +3,7 @@
 To control PWM channels you have to create an Output class instance for each channel. The board has up to 6 channels.
 
 ```C++
-#define N_OUTPUTS 6
+#define N_PWM 6
 
 Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
 Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
@@ -93,4 +93,45 @@ void setup(){
   outputs[2].set_pid(&inputs[1].value, 50.5);
   ...
 }
+```
+## I2C Sensors
+
+The board has a TCA9544 I2C multiplexer of 4 channels. This multiplexer allows reading sensors with the same address. You can control the multiplexer with the **Sensors** class
+
+```C++
+uint8_t multiplexer_address = 0x70;
+float temperature;
+Sensors sensors(multiplexer_address);
+
+void setup(){
+  Wire.begin();
+  Serial.begin(9600);
+}
+
+void loop(){
+  sensors.set_multiplexer_channel(0);
+  temperature = sensors.read_sen0546_temperature();
+  Serial.println(temperature);
+}
+```
+
+Sensors API reference:
+
+```C++
+// SEN0546 Temperature and humidity sensor
+Sensors::read_sen0546_temperature();
+Sensors::read_sen0546_humidity();
+
+// SEN0322 Oxygen Sensor
+Sensors::read_sen0322_address_0();
+Sensors::read_sen0322_address_1();
+Sensors::read_sen0322_address_2();
+Sensors::read_sen0322_default();
+
+// MPRLS Pressure sensor
+Sensors::read_mprls();
+Sensors::set_mprls_range(float p_min, float p_max);
+
+// SEN0343 differential pressure
+Sensors::read_sen0343_diffpressure();
 ```

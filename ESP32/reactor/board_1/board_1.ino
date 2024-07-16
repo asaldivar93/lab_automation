@@ -1,19 +1,17 @@
 #include <Arduino.h>
-#include <esp_now.h>
-#include <WiFi.h>
 
 #include "bioreactify.h"
 #include "comms_handle.h"
 
-#define N_PWM 5
-#define N_DAC 2
+#define N_PWM 0
+#define N_DAC 0
 
-#define N_ADC 6
+#define N_ADC 0
 #define N_I2C 2
-#define N_SLAVES 1
+#define N_SLAVES 0
 
 // Serial Configuration
-String ADDRESS = "M0";
+String ADDRESS = "M1";
 boolean new_command = false;
 String input_string = "";
 
@@ -38,34 +36,20 @@ float Ki = 0.2;
 float Kd = 0.;
 
 // PWM Configuration
-Output CH_0(0, PIN_CH0, "pwm", MANUAL, 0);
-Output CH_1(1, PIN_CH1, "pwm", MANUAL, 0);
-Output CH_2(2, PIN_CH2, "pwm", MANUAL, 0);
-Output CH_3(3, PIN_CH3, "pwm", MANUAL, 0);
-Output CH_4(4, PIN_CH4, "pwm", MANUAL, 0);
-Output outputs[N_PWM] = {CH_0, CH_1, CH_2, CH_3, CH_4};
+Output outputs[N_PWM];
 
 // DAC Configuration
-Output DAC_1(0, DAC1, "dac", MANUAL, 0);
-Output DAC_2(1, DAC2, "dac", MANUAL, 0);
-Output dacs[N_DAC] = {DAC_1, DAC_2};
+Output dacs[N_DAC];
 
 // ADC Configuration
-MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
-Input ACH_0(1, "adc", "temperature_0");
-Input ACH_1(2, "adc", "temperature_1");
-Input ACH_2(3, "adc", "dissolved_oxygen");
-Input ACH_3(4, "adc", "ph");
-Input ACH_4(6, "adc", "biomass_1");
-Input ACH_5(7, "adc", "biomass_2");
-Input analogs[N_ADC] = {ACH_0, ACH_1, ACH_2, ACH_3, ACH_4, ACH_5};
+Input analogs[N_ADC];
 
 // I2C Configuration
 uint8_t multiplexer_address = 0x70;
 Sensors sensors(multiplexer_address);
 
-Input DCH_0(0, "i2c", "humidity_0");
-Input DCH_1(1, "i2c", "humidity_1");
+Input DCH_0(0, "i2c", "dP_0_Pa");
+Input DCH_1(1, "i2c", "dP_1_Pa");
 Input digitals[N_I2C] = {DCH_0, DCH_1};
 
 // Timer Configuration
@@ -98,47 +82,18 @@ void serial_comms_code(void *parameters) {
   for (;;) {
     String input_string = parse_serial_master(&new_command);
     parse_string(input_string);
+    vTaskDelay(10);
   }
 }
 
 // ESPnow
 // Slaves Configuration
-Slave slaves[N_SLAVES] =
-{ {"S1", {0x58, 0xBF, 0x25, 0x36, 0x78, 0x94}, "", "('stp',0),('stp',1),('stp',2)"} };
-
-MessageSlaves incoming_message[N_SLAVES];
-MessageSlaves buffer_message;
-SimpleMessage outgoing_message;
-bool waiting;
-esp_now_peer_info_t esp_slaves[N_SLAVES];
-
-void on_message_sent(const uint8_t *mac_address, esp_now_send_status_t status){
-  if (status == 0){
-    waiting = false;
-  }
-}
-
-void on_message_recv(const uint8_t *mac_address, const uint8_t *inMessage, int size){
-  waiting = true;
-  memcpy(&buffer_message, inMessage, size);
-  String inputString = parse_serial(buffer_message.message, &new_command);
-  new_command = false;
-}
+Slave slaves[N_SLAVES];
 
 // Inint functions
 void init_comms(void){
   Wire.begin();
   Serial.begin(230400);
-  WiFi.mode(WIFI_STA);
-  esp_now_init();
-  esp_now_register_recv_cb(on_message_recv);
-  esp_now_register_send_cb(on_message_sent);
-  for(int i=0; i<N_SLAVES; i++){
-    memcpy(esp_slaves[i].peer_addr, slaves[i].broadcastAddress, 6);
-    esp_slaves[i].channel = i;
-    esp_slaves[i].encrypt = false;
-    esp_now_add_peer(&esp_slaves[i]);
-  }
   xTaskCreatePinnedToCore(serial_comms_code, "serial_comms", 10000, NULL, 0, &serial_comms, 0);
 }
 
@@ -158,58 +113,21 @@ void init_outputs(void){
 void setup() {
   // Initialize functions
   init_comms();
-  init_outputs();
+  //init_outputs();
   init_timers();
 
   // ------------ Modify Configuration -------------- //
-  adc_0.begin(CS0);
-  adc_0.set_spi_speed(1000000);
-  adc_0.set_ref_voltage(3.3);
 
-  analogs[0].set_temperature_cal(8.7561e-4, 2.5343e-4, 1.84499e-7);
-  analogs[0].set_temperature_resistor(10000);
-
-  analogs[1].set_temperature_cal(8.7561e-4, 2.5343e-4, 1.84499e-7);
-  analogs[1].set_temperature_resistor(10000);
-
-  analogs[2].set_dissolved_oxygen_cal(85.1312926551, -49.7487023023);
-  analogs[3].set_ph_cal(6.006, -3.5108);
-
-  outputs[4].set_pid(&analogs[3].value, 48);
-  outputs[4].set_output_limits(0, 240);
   // ------------ Modify Configuration -------------- //
 }
 
 void loop() {
 
   // Sample analog channels as fast as possible
-  for(int i=0; i<N_ADC; i++){
-    uint8_t channel = analogs[i].channel;
-    analogs[i].moving_average(adc_0.read_adc(channel));
-  }
-
   if (TIMER_1) {
     // Transform data
-    for(int i=0; i<N_ADC; i++){
-      analogs[i].get_moving_average();
-    }
+    
     // ------------ Modify Configuration -------------- //
-    analogs[0].get_temperature();
-    analogs[1].get_temperature();
-    analogs[2].get_dissolved_oxygen();
-    analogs[3].get_ph();
-    analogs[4].value = analogs[4].get_analog_value();
-    analogs[5].value = analogs[5].get_analog_value();
-
-    outputs[0].write_output();
-    outputs[1].write_output();
-    outputs[2].write_output();
-    outputs[3].write_output();
-    outputs[4].write_output();
-
-    for(int i=0; i<N_ADC; i++){
-      analogs[i].reset_moving_average();
-    }
     // ------------ Modify Configuration -------------- //
 
     // Update buffers
@@ -220,13 +138,25 @@ void loop() {
     esp_timer_start_once(timer_1_handle, cycle_time_timer_1);
     TIMER_1 = false;
   }
-
+  
+  for(int i=0; i<2; i++){
+    sensors.set_multiplexer_channel(i);
+    float dp = sensors.read_sen0343_diffpressure();
+    Serial.print(dp);
+    Serial.print(", ");
+  }
+  Serial.println("");
+  
   if (TIMER_2) {
-    sensors.set_multiplexer_channel(0);
-    digitals[0].value = sensors.read_sen0546_humidity();
-    sensors.set_multiplexer_channel(1);
-    digitals[1].value = sensors.read_sen0546_humidity();
+    for(int i=0; i<2; i++){
+      digitals[i].get_moving_average();
+      digitals[i].value = digitals[i].get_analog_value();
+    }
 
+    for(int i=0; i<2; i++){
+      digitals[i].reset_moving_average();
+    }
+    
     update_inputs_buffer(digitals, N_I2C, &i2c_buffer);
     esp_timer_start_once(timer_2_handle, cycle_time_timer_2);
     TIMER_2 = false;
@@ -370,13 +300,6 @@ void parse_string(String input_string) {
             }
         }
       }
-    }
-    else {
-      strcpy(outgoing_message.message, input_string.c_str());
-      for (int i = 0; i < N_SLAVES; i++){
-        esp_now_send(slaves[i].broadcastAddress, (uint8_t *) &outgoing_message, sizeof(outgoing_message));
-      }
-      Serial.println(ok_string);
     }
     new_command = false;
   }

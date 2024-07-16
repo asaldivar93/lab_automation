@@ -117,6 +117,10 @@ void init_outputs(void){
     ledcAttachPin(outputs[i].pin, outputs[i].channel);
     ledcWrite(outputs[i].channel, outputs[i].value);
 
+    for(int i=1; i<N_PWM; i+=2){
+      outputs[i].set_output_limits(0, 85);
+    }
+
     outputs[i].set_output_limits(0, 255);
     outputs[i].set_pid_tunings(Kp, Ki, Kd);
     outputs[i].set_sample_time_us(cycle_time_timer_1);
@@ -166,15 +170,17 @@ void loop() {
 
     for(int i=0; i<N_ADC; i+=2){
       analogs[i].get_temp_opamp();
-      Serial.print(analogs[i].value);
-      Serial.print(", ");
     }
-    Serial.println("");
     
     for(int i=1; i<N_ADC; i+=2){
       analogs[i].value = analogs[i].get_analog_value();;
     }
-
+    Serial.print(analogs[0].value, 4);
+    Serial.print(", ");
+    Serial.print(analogs[1].value, 6);
+    Serial.print(", ");
+    Serial.print(analogs[3].value, 4);
+    Serial.println("");
     for(int i=0; i<N_PWM; i++){
       outputs[i].write_output();
     }

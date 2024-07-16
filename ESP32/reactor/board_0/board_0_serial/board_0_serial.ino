@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include <esp_now.h>
-#include <WiFi.h>
 
 #include "bioreactify.h"
 #include "comms_handle.h"
@@ -104,42 +102,12 @@ void serial_comms_code(void *parameters) {
 
 // ESPnow
 // Slaves Configuration
-Slave slaves[N_SLAVES] =
-{ {"S1", {0x58, 0xBF, 0x25, 0x36, 0x78, 0x94}, "", "('stp',0),('stp',1),('stp',2)"} };
-
-MessageSlaves incoming_message[N_SLAVES];
-MessageSlaves buffer_message;
-SimpleMessage outgoing_message;
-bool waiting;
-esp_now_peer_info_t esp_slaves[N_SLAVES];
-
-void on_message_sent(const uint8_t *mac_address, esp_now_send_status_t status){
-  if (status == 0){
-    waiting = false;
-  }
-}
-
-void on_message_recv(const uint8_t *mac_address, const uint8_t *inMessage, int size){
-  waiting = true;
-  memcpy(&buffer_message, inMessage, size);
-  String inputString = parse_serial(buffer_message.message, &new_command);
-  new_command = false;
-}
+Slave slaves[N_SLAVES];
 
 // Inint functions
 void init_comms(void){
   Wire.begin();
   Serial.begin(230400);
-  WiFi.mode(WIFI_STA);
-  esp_now_init();
-  esp_now_register_recv_cb(on_message_recv);
-  esp_now_register_send_cb(on_message_sent);
-  for(int i=0; i<N_SLAVES; i++){
-    memcpy(esp_slaves[i].peer_addr, slaves[i].broadcastAddress, 6);
-    esp_slaves[i].channel = i;
-    esp_slaves[i].encrypt = false;
-    esp_now_add_peer(&esp_slaves[i]);
-  }
   xTaskCreatePinnedToCore(serial_comms_code, "serial_comms", 10000, NULL, 0, &serial_comms, 0);
 }
 
@@ -374,13 +342,6 @@ void parse_string(String input_string) {
             }
         }
       }
-    }
-    else {
-      strcpy(outgoing_message.message, input_string.c_str());
-      for (int i = 0; i < N_SLAVES; i++){
-        esp_now_send(slaves[i].broadcastAddress, (uint8_t *) &outgoing_message, sizeof(outgoing_message));
-      }
-      Serial.println(ok_string);
     }
     new_command = false;
   }

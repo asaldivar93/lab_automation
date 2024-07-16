@@ -8,6 +8,8 @@ esp_timer_handle_t	KEYWORD1
 esp_timer_create_args_t	KEYWORD1
 set_voltage_divider_resistor  KEYWORD2
 set_opamp_resistors KEYWORD2
+set_voltage_divider_resistor KEYWORD2
+set_opamp_resistors KEYWORD2
 read_sen0546_temperature	KEYWORD2
 esp_now_register_recv_cb	KEYWORD2
 esp_now_register_send_cb	KEYWORD2
@@ -56,6 +58,7 @@ init_timers	KEYWORD2
 get_current	KEYWORD2
 read_adc	KEYWORD2
 read_mprls	KEYWORD2
+set_ph_cal  KEYWORD2
 set_pid	KEYWORD2
 get_ph	KEYWORD2
 value	KEYWORD2
