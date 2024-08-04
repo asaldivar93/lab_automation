@@ -114,7 +114,6 @@ class Output {
 public:
   Output(int Channel, int Pin, String Type, int Control_mode, int Value);
 
-  void get_info(void);
   void write_output(void);
   void write_dac(int value);
   void set_manual_output(int value);

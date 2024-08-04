@@ -1,10 +1,11 @@
 #include <Arduino.h>
 
+#include "DacESP32.h"
+
 #include "bioreactify.h"
 #include "comms_handle.h"
 
 #define N_PWM 8
-#define N_DAC 2
 
 #define N_ADC 8
 #define N_I2C 0
@@ -49,9 +50,8 @@ Output CH_7(7, PIN_CH7, "pwm", MANUAL, 0);
 Output outputs[N_PWM] = {CH_0, CH_1, CH_2, CH_3, CH_4, CH_5, CH_6, CH_7};
 
 // DAC Configuration
-Output DAC_1(0, DAC1, "dac", MANUAL, 0);
-Output DAC_2(1, DAC2, "dac", MANUAL, 0);
-Output dacs[N_DAC] = {DAC_1, DAC_2};
+DacESP32 DAC_1(DAC_CHANNEL_1);
+DacESP32 DAC_2(DAC_CHANNEL_2);
 
 // ADC Configuration
 MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
@@ -112,20 +112,26 @@ void init_comms(void){
 }
 
 void init_outputs(void){
+  // Initialize PWM channels
   for (int i = 0; i < N_PWM; i++) {
-    ledcSetup(outputs[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
-    ledcAttachPin(outputs[i].pin, outputs[i].channel);
+    ledcAttach(outputs[i].pin, LEDC_BASE_FREQ, LEDC_BIT);
     ledcWrite(outputs[i].channel, outputs[i].value);
-
-    for(int i=1; i<N_PWM; i+=2){
-      outputs[i].set_output_limits(0, 85);
-    }
 
     outputs[i].set_output_limits(0, 255);
     outputs[i].set_pid_tunings(Kp, Ki, Kd);
     outputs[i].set_sample_time_us(cycle_time_timer_1);
-    outputs[i].set_gh_filter(0.01);
+    outputs[i].set_gh_filter(0.7);
   }
+  for(int i=0; i<N_PWM; i+=2){
+    outputs[i].set_output_limits(0, 85);
+  }
+
+  // Initialize DAC for Biomass Sensor
+  DAC_1.outputCW(500, DAC_CW_SCALE_2);
+  DAC_1.setCwOffset(-45);
+
+  DAC_2.outputCW(500, DAC_CW_SCALE_2);
+  DAC_2.setCwOffset(-45);
 }
 
 void setup() {
@@ -138,7 +144,7 @@ void setup() {
   adc_0.begin(CS0);
   adc_0.set_spi_speed(1000000);
   adc_0.set_ref_voltage(3.3);
-  
+
   float thermistor[3] = {8.1197e-4, 2.65207e-4, 1.272206e-7}; // 103JT-025 semitec
   float ref_resistance = 5100;
   float op_amp_resistors[2] = {1500, 2200};
@@ -147,7 +153,6 @@ void setup() {
     analogs[i].set_voltage_divider_resistor(ref_resistance);
     analogs[i].set_opamp_resistors(op_amp_resistors[0], op_amp_resistors[1]);
     analogs[i].set_steinhart_coeffs(thermistor[0], thermistor[1], thermistor[2]);
-    
   }
   // ------------ Modify Configuration -------------- //
 }
@@ -171,16 +176,11 @@ void loop() {
     for(int i=0; i<N_ADC; i+=2){
       analogs[i].get_temp_opamp();
     }
-    
+
     for(int i=1; i<N_ADC; i+=2){
       analogs[i].value = analogs[i].get_analog_value();;
     }
-    Serial.print(analogs[0].value, 4);
-    Serial.print(", ");
-    Serial.print(analogs[1].value, 6);
-    Serial.print(", ");
-    Serial.print(analogs[3].value, 4);
-    Serial.println("");
+
     for(int i=0; i<N_PWM; i++){
       outputs[i].write_output();
     }
@@ -254,19 +254,6 @@ void parse_string(String input_string) {
         pwm_buffer = "";
         adc_buffer = "";
         i2c_buffer = "";
-      }
-
-      if (command == WRITE_DAC) {
-        // "ADDR 3,CHANNEL,VALUE,!"
-        lastcomma = firstcomma;
-        nextcomma = input_string.indexOf(',', lastcomma + 1);
-        int channel = input_string.substring(lastcomma + 1, nextcomma).toInt();
-        lastcomma = nextcomma;
-        nextcomma = input_string.indexOf(',', lastcomma + 1);
-        int value = input_string.substring(lastcomma + 1, nextcomma).toInt();
-
-        dacs[channel].write_dac(value);
-        Serial.println(ok_string);
       }
 
       if (command == TOGGLE_CONTROL_MODE) {

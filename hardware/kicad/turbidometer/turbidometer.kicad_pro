@@ -483,8 +483,8 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "production/",
-      "pos_files": "",
+      "plot": "production/gerber/",
+      "pos_files": "production/reactor.pos",
       "specctra_dsn": "",
       "step": "",
       "svg": "",
@@ -524,7 +524,7 @@
           "group_by": false,
           "label": "Datasheet",
           "name": "Datasheet",
-          "show": true
+          "show": false
         },
         {
           "group_by": true,
@@ -536,13 +536,13 @@
           "group_by": false,
           "label": "Qty",
           "name": "${QUANTITY}",
-          "show": true
+          "show": false
         },
         {
-          "group_by": true,
+          "group_by": false,
           "label": "DNP",
           "name": "${DNP}",
-          "show": true
+          "show": false
         },
         {
           "group_by": false,

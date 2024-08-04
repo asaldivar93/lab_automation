@@ -55,7 +55,7 @@ String get_inputs_info(Input inputs[], int numberOfInputs){
   String inputs_string = "";
 
   for (int i=0; i < numberOfInputs; i++){
-    inputs_string = inputs_string + "(" + "'" + inputs[i].type + "'," + inputs[i].channel + "," + "'" + inputs[i].variable + "'" + "),";
+    inputs_string = inputs_string + "(" + "'" + inputs[i].type + "'," + i + "," + "'" + inputs[i].variable + "'" + "),";
   }
   return inputs_string;
 }
@@ -72,7 +72,7 @@ void update_inputs_buffer(Input inputs[], int numberOfInputs, String *inputsBuff
   */
   *inputsBuffer = ""; // Clear Buffer to keep only most recent readings
   for(int i=0; i < numberOfInputs; i++){
-    *inputsBuffer = *inputsBuffer + "(" + inputs[i].channel + "," + inputs[i].value + "),";
+    *inputsBuffer = *inputsBuffer + "(" + i + "," + inputs[i].value + "),";
   }
 }
 

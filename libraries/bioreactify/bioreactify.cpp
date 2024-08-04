@@ -224,10 +224,6 @@ Output::Output(int Channel, int Pin, String Type, int Control_mode, int Value){
   manual_value = Value;
 }
 
-void Output::get_info(void){
-  Serial.println(type);
-}
-
 void Output::write_output(void) {
 
   switch (control_mode) {

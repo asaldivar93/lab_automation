@@ -140,7 +140,6 @@ class Experiment():
         ids_to_add, values_to_add = self.build_sql_row_list(data_dict, "outputs")
         ids.extend(ids_to_add)
         values.extend(values_to_add)
-
         ids_to_add, values_to_add = self.build_sql_row_list(data_dict, "inputs")
 
         ids.extend(ids_to_add)

@@ -2,14 +2,15 @@
 #include <esp_now.h>
 #include <WiFi.h>
 
+#include "DacESP32.h"
+
 #include "bioreactify.h"
 #include "comms_handle.h"
 
 #define N_PWM 5
-#define N_DAC 2
 
 #define N_ADC 6
-#define N_I2C 2
+#define N_I2C 1
 #define N_SLAVES 1
 
 // Serial Configuration
@@ -46,9 +47,8 @@ Output CH_4(4, PIN_CH4, "pwm", MANUAL, 0);
 Output outputs[N_PWM] = {CH_0, CH_1, CH_2, CH_3, CH_4};
 
 // DAC Configuration
-Output DAC_1(0, DAC1, "dac", MANUAL, 0);
-Output DAC_2(1, DAC2, "dac", MANUAL, 0);
-Output dacs[N_DAC] = {DAC_1, DAC_2};
+DacESP32 DAC_1(DAC_CHANNEL_1);
+DacESP32 DAC_2(DAC_CHANNEL_2);
 
 // ADC Configuration
 MCP3208 adc_0(SPI_MISO, SPI_MOSI, SPI_CLK);
@@ -65,8 +65,7 @@ uint8_t multiplexer_address = 0x70;
 Sensors sensors(multiplexer_address);
 
 Input DCH_0(0, "i2c", "oxygen");
-Input DCH_1(1, "i2c", "co2");
-Input digitals[N_I2C] = {DCH_0, DCH_1};
+Input digitals[N_I2C] = {DCH_0};
 
 // Timer Configuration
 esp_timer_create_args_t timer_1_args;
@@ -144,9 +143,9 @@ void init_comms(void){
 }
 
 void init_outputs(void){
+  // Initialize PWM channels
   for (int i = 0; i < N_PWM; i++) {
-    ledcSetup(outputs[i].channel, LEDC_BASE_FREQ, LEDC_BIT);
-    ledcAttachPin(outputs[i].pin, outputs[i].channel);
+    ledcAttach(outputs[i].pin, LEDC_BASE_FREQ, LEDC_BIT);
     ledcWrite(outputs[i].channel, outputs[i].value);
 
     outputs[i].set_output_limits(0, 255);
@@ -154,6 +153,13 @@ void init_outputs(void){
     outputs[i].set_sample_time_us(cycle_time_timer_1);
     outputs[i].set_gh_filter(0.01);
   }
+
+  // Initialize DAC for Biomass Sensor
+  DAC_1.outputCW(500, DAC_CW_SCALE_2);
+  DAC_1.setCwOffset(-45);
+
+  DAC_2.outputCW(500, DAC_CW_SCALE_2);
+  DAC_2.setCwOffset(-45);
 }
 
 void setup() {
@@ -180,7 +186,6 @@ void setup() {
   analogs[2].set_dissolved_oxygen_cal(85.1312926551, -49.7487023023);
   analogs[3].set_ph_cal(6.006, -3.5108);
 
-  outputs[4].set_pid(&analogs[0].value, 48);
   outputs[4].set_output_limits(0, 240);
   // ------------ Modify Configuration -------------- //
 }

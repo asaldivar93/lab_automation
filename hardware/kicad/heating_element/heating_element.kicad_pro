@@ -179,6 +179,7 @@
       "track_widths": [
         0.0,
         0.2,
+        0.3,
         0.5,
         1.5
       ],
@@ -446,7 +447,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "smart_sleeve.kicad_pro",
+    "filename": "heating_element.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -481,7 +482,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "production/",
+      "plot": "production/gerber",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",

@@ -70,7 +70,7 @@ class Output():
         self.type = type
         self.channel = channel
         self.bounds = valid_output_types[type]
-        self.control_mode = manual_control(0, 0)
+        self.control_mode = manual_control(channel, 0)
 
     def __repr__(self):
         return f"Output(id={self.id}, channel={self.channel}, type={self.type})"
@@ -91,17 +91,20 @@ class Input():
 
 class Board():
     def __init__(self, address: str, port_name: str = "/dev/ttyUSB0", baud_rate: float = 230400, config_dir: str = "configuration/"):
+        print("Initializing")
         self.set_serial_port(port_name)
         self.set_baud_rate(baud_rate)
+        print(f"Connecting to port: {port_name}")
         self.open_connection(port_name)
+        print("Connection Successfull")
         self.address = address
+        self.samples_per_second = 4
+        print("Requesting board info")
         board_info_dict = self.request_board_info()
 
         self.id = self.address
         self.channel = 0
         self.port_name = port_name
-
-        self.samples_per_second = board_info_dict["samples_per_second"]
 
         self.set_outputs(board_info_dict)
         self.set_inputs(board_info_dict)
@@ -191,18 +194,32 @@ class Board():
                 address, args = args_queue[0]
                 self.write_command(address, command, args)
                 args_queue.pop(0)
+                time.sleep(0.01)
             self.is_config_updated = False
             print("Board configuration updated")
 
     def write_command(self, address: str, command: str, args: list = None):
         confirmation = False
+        send_command = True
+        last_time = time.time()
         cmd_str = self.build_cmd_str(address, command, args)
-        self.serial_port.flushInput()
-        self.serial_port.write(cmd_str.encode())
+        number_of_trials = 0
         while not confirmation:
-            input = self.readline()
-            if self.is_valid_input_string(input):
-                confirmation = True
+            if (time.time() - last_time) > 0.250:
+                send_command = True
+            if send_command:
+                self.serial_port.flushInput()
+                self.serial_port.write(cmd_str.encode())
+                last_time = time.time()
+                send_command = False
+                number_of_trials += 1
+            if number_of_trials > 20:
+                print(f"Confirmation failed on port: {self.serial_port}")
+                break
+            if self.serial_port.inWaiting() > 0:
+                input = self.readline() 
+                if self.is_valid_input_string(input):
+                    confirmation = True
 
         return input
 
