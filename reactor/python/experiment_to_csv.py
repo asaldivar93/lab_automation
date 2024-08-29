@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on 2024 May 15 19:25
+"""Saves experiment data to csv.
 
+Created on 2024 May 15 19:25.
 @author: Alexis Saldivar
 """
-import argparse
+from typing import object
 
-import pandas as pd
 import Handle
+import argparse
+import polars as pl
 
 sqlite_db = Handle.Database(DATABASE_PATH="database.db")
 experiments_db = pd.read_csv("experiments_db.tsv", sep="\t")
 
 
-def argument_parser(args=None):
+def argument_parser(args=None) -> object:
     parser = argparse.ArgumentParser(description="Exports experiment data to .csv")
     parser.add_argument("-n", "--name", type=str, help="Name of the experiment")
-    arguments = parser.parse_args()
 
-    return arguments
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
